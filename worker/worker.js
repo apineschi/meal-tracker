@@ -261,7 +261,7 @@ async function lookupUsdaFood(env, query) {
     if (kcal == null) return null;
 
     console.log(`USDA match for "${query}": "${food.description}" = ${kcal} kcal/100g`);
-    return { description: food.description, kcalPer100g: kcal };
+    return { description: food.description, kcalPer100g: kcal, fdcId: food.fdcId };
   } catch (err) {
     console.error("USDA lookup failed", err);
     return null;
@@ -345,6 +345,7 @@ async function callWorkersAI(env, message) {
       usda_source: true,
       usda_food: food.description,
       usda_kcal_per_100g: Math.round(food.kcalPer100g),
+      usda_url: food.fdcId ? `https://fdc.nal.usda.gov/food-details/${food.fdcId}/nutrients` : null,
     };
   });
 

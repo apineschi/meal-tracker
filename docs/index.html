@@ -605,14 +605,29 @@
     if (totalEl) totalEl.textContent = total;
   }
 
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
   function renderMealView(m, i) {
     const time = new Date(m.time).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
     const itemsText = m.items
       .map((it) => {
-        const perUnit =
-          it.unit_label && it.unit_calories != null ? `, ${it.unit_calories} kcal/${it.unit_label}` : "";
-        const usda = it.usda_source ? ` (USDA: ${it.usda_food}, ${it.usda_kcal_per_100g} kcal/100g)` : "";
-        return `${it.name} (${it.calories} kcal${perUnit}${usda})`;
+        let perUnit = "";
+        if (it.unit_label && it.unit_calories != null) {
+          perUnit = `, ${it.unit_calories} kcal/${escapeHtml(it.unit_label)}`;
+          if (it.usda_source) {
+            const linkText = escapeHtml(it.usda_food || "USDA");
+            perUnit += it.usda_url
+              ? ` (<a href="${it.usda_url}" target="_blank" rel="noopener noreferrer">${linkText}</a>)`
+              : ` (${linkText})`;
+          }
+        }
+        return `${escapeHtml(it.name)} (${it.calories} kcal${perUnit})`;
       })
       .join(", ");
     const tagsHtml = m.tags.length
