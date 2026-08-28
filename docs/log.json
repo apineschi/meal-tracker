@@ -403,9 +403,50 @@
         ],
         "tags": [],
         "total_calories": 628
+      },
+      {
+        "time": "2026-08-28T16:19:35.138Z",
+        "raw_input": "1 hamburger bun, 3 fennel bulbs, 1 chicken pot pie",
+        "from_photo": false,
+        "items": [
+          {
+            "name": "hamburger bun",
+            "quantity": "net weight of bun, assume 1 bun is roughly 100g",
+            "calories": 259,
+            "unit_label": "hamburger bun",
+            "unit_calories": 259,
+            "estimated_gram_weight": 100,
+            "usda_source": true,
+            "usda_food": "Fast foods, hamburger; single, regular patty; double decker bun with condiments and special sauce",
+            "usda_kcal_per_100g": 259,
+            "usda_url": "https://fdc.nal.usda.gov/food-details/173318/nutrients"
+          },
+          {
+            "name": "fennel bulbs",
+            "quantity": "3 bulbs, assume 1 bulb is roughly 180g",
+            "calories": 72,
+            "unit_label": "fennel bulb",
+            "unit_calories": 24,
+            "estimated_gram_weight": 540
+          },
+          {
+            "name": "chicken pot pie",
+            "quantity": "1 pie, assume 1 pie is roughly 300g",
+            "calories": 612,
+            "unit_label": "100g chicken pot pie",
+            "unit_calories": 612,
+            "estimated_gram_weight": 300,
+            "usda_source": true,
+            "usda_food": "Chicken pot pie, frozen entree, prepared",
+            "usda_kcal_per_100g": 204,
+            "usda_url": "https://fdc.nal.usda.gov/food-details/173331/nutrients"
+          }
+        ],
+        "tags": [],
+        "total_calories": 943
       }
     ],
-    "total_calories": 7563
+    "total_calories": 8506
   },
   "2026-08-13": {
     "meals": [
