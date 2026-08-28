@@ -16,6 +16,12 @@
     --border: #dfe4e2;
     --text: #1a1a1a;
     --muted: #6b7570;
+    --day-under-bg: #d9f2e3;
+    --day-under-text: #1a6b45;
+    --day-over-bg: #fbdcd7;
+    --day-over-text: #a3352a;
+    --day-none-bg: #eceeed;
+    --day-none-text: #8a9490;
   }
   * { box-sizing: border-box; min-width: 0; }
   html, body { overflow-x: hidden; max-width: 100%; }
@@ -90,12 +96,16 @@
   }
   .day.empty { border: none; background: none; cursor: default; }
   .day.selected { outline: 2px solid var(--accent); }
-  .day .num { font-size: 12px; font-weight: 600; }
-  .day .flag { font-size: 14px; line-height: 1; margin-top: 2px; }
+  .day.none { background: var(--day-none-bg); }
+  .day.none .num, .day.none .kcal { color: var(--day-none-text); }
+  .day.under { background: var(--day-under-bg); }
+  .day.under .num, .day.under .kcal { color: var(--day-under-text); }
+  .day.over { background: var(--day-over-bg); }
+  .day.over .num, .day.over .kcal { color: var(--day-over-text); }
+  .day .num { font-size: 13px; font-weight: 600; margin-top: 6px; }
   .day .kcal {
-    font-size: 9px;
-    color: var(--muted);
-    margin-top: 1px;
+    font-size: 10px;
+    margin-top: 3px;
     max-width: 100%;
     white-space: nowrap;
     overflow: hidden;
@@ -103,6 +113,7 @@
     text-align: center;
   }
   .day.match { background: #fff7d6; border-color: #e8d27a; }
+  .day.match .num, .day.match .kcal { color: var(--text); }
 
   input[type="text"], input[type="number"] {
     width: 100%;
@@ -127,6 +138,7 @@
     padding: 8px 0;
     font-size: 13px;
   }
+  .meal-tags { margin-top: 4px; }
   .meal:first-child { border-top: none; }
   .meal .items { color: var(--muted); margin-top: 2px; }
   .meal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
@@ -147,8 +159,7 @@
     align-items: center;
     margin-top: 6px;
   }
-  .edit-form .item-row input[data-role="name"] { flex: 2; min-width: 0; }
-  .edit-form .item-row input[data-role="quantity"] { flex: 1; min-width: 0; }
+  .edit-form .item-row input[data-role="description"] { flex: 3; min-width: 0; }
   .edit-form .item-row input[data-role="calories"] { flex: 1; min-width: 0; }
   .edit-form .item-row input {
     padding: 6px 7px;
@@ -303,7 +314,11 @@
   .search-empty { font-size: 13px; color: var(--muted); margin-top: 8px; }
 
   .legend { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 12px; color: var(--muted); margin-top: 8px; }
-  .legend span { display: flex; align-items: center; gap: 4px; }
+  .legend span { display: flex; align-items: center; gap: 5px; }
+  .legend .swatch { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+  .legend .swatch.under { background: var(--day-under-bg); border: 1px solid var(--day-under-text); }
+  .legend .swatch.over { background: var(--day-over-bg); border: 1px solid var(--day-over-text); }
+  .legend .swatch.none { background: var(--day-none-bg); border: 1px solid var(--border); }
 
   .modal-overlay {
     position: fixed;
@@ -356,15 +371,6 @@
 <main>
 
   <div class="card">
-    <label for="search">Search by tag or ingredient</label>
-    <div class="settings-row">
-      <div><input type="text" id="search" placeholder="e.g. vegetarian, chicken, lunch" /></div>
-      <button id="search-btn">Search</button>
-    </div>
-    <div id="search-results"></div>
-  </div>
-
-  <div class="card">
     <div class="month-nav">
       <button id="prev">&larr;</button>
       <span id="month-label"></span>
@@ -373,15 +379,14 @@
     <div class="grid" id="dow-row"></div>
     <div class="grid" id="calendar"></div>
     <div class="legend">
-      <span>✅ under limit</span>
-      <span>⚠️ over limit</span>
-      <span>· no meals logged</span>
+      <span><span class="swatch under"></span> under limit</span>
+      <span><span class="swatch over"></span> over limit</span>
+      <span><span class="swatch none"></span> no meals logged</span>
     </div>
   </div>
 
   <div class="card" id="day-detail" style="display:none;">
     <div class="day-total" id="day-total"></div>
-    <div id="day-tags"></div>
     <div id="day-meals"></div>
     <div class="add-meal">
       <label>Add a meal to this day</label>
@@ -405,6 +410,15 @@
       <button id="add-meal-btn">Log meal</button>
       <div id="add-meal-status"></div>
     </div>
+  </div>
+
+  <div class="card">
+    <label for="search">Search by tag or ingredient</label>
+    <div class="settings-row">
+      <div><input type="text" id="search" placeholder="e.g. vegetarian, chicken, lunch" /></div>
+      <button id="search-btn">Search</button>
+    </div>
+    <div id="search-results"></div>
   </div>
 
   <div class="card">
@@ -527,20 +541,21 @@
 
       const cell = document.createElement("div");
       cell.className = "day";
-      if (dateStr === selectedDate) cell.classList.add("selected");
-      if (dayMatchesSearch(dateStr)) cell.classList.add("match");
 
-      let flag = "·";
       let kcalText = "";
       if (entry) {
         const over = entry.total_calories >= settings.daily_limit;
-        flag = over ? "⚠️" : "✅";
+        cell.classList.add(over ? "over" : "under");
         kcalText = String(entry.total_calories);
+      } else {
+        cell.classList.add("none");
       }
+
+      if (dateStr === selectedDate) cell.classList.add("selected");
+      if (dayMatchesSearch(dateStr)) cell.classList.add("match");
 
       cell.innerHTML = `
         <div class="num">${day}</div>
-        <div class="flag">${flag}</div>
         <div class="kcal">${kcalText}</div>
       `;
       cell.addEventListener("click", () => {
@@ -554,14 +569,17 @@
   }
 
   function itemRowHtml(item) {
-    const name = (item.name || "").replace(/"/g, "&quot;");
-    const quantity = (item.quantity || "").replace(/"/g, "&quot;");
+    const description = [item.quantity, item.name]
+      .filter(Boolean)
+      .join(" ")
+      .replace(/"/g, "&quot;");
     const calories = item.calories != null ? item.calories : "";
-    return `<div class="item-row">
-      <input type="text" data-role="name" placeholder="Name" value="${name}" />
-      <input type="text" data-role="quantity" placeholder="Qty" value="${quantity}" />
+    const unitLabel = (item.unit_label || "").replace(/"/g, "&quot;");
+    const unitCalories = item.unit_calories != null ? item.unit_calories : "";
+    return `<div class="item-row" data-unit-label="${unitLabel}" data-unit-calories="${unitCalories}">
+      <input type="text" data-role="description" placeholder="e.g. 300g blueberries" value="${description}" />
       <input type="number" data-role="calories" placeholder="kcal" value="${calories}" />
-      <button type="button" class="recalc" data-action="recalc-item" title="Recalculate from name/quantity">&#8635;</button>
+      <button type="button" class="recalc" data-action="recalc-item" title="Recalculate from description">&#8635;</button>
       <button type="button" class="remove" data-action="remove-item" title="Remove item">&times;</button>
     </div>`;
   }
@@ -580,21 +598,22 @@
     const itemsText = m.items
       .map((it) => {
         const perUnit =
-          it.unit_label && it.unit_calories != null && it.unit_calories !== it.calories
-            ? `, ${it.unit_calories} kcal/${it.unit_label}`
-            : "";
+          it.unit_label && it.unit_calories != null ? `, ${it.unit_calories} kcal/${it.unit_label}` : "";
         return `${it.name} (${it.calories} kcal${perUnit})`;
       })
       .join(", ");
-    const tagsText = m.tags.length ? ` &middot; ${m.tags.join(", ")}` : "";
+    const tagsHtml = m.tags.length
+      ? `<div class="meal-tags">${m.tags.map((t) => `<span class="tag-chip">${t}</span>`).join("")}</div>`
+      : "";
     return `<div class="meal">
       <div class="meal-head">
-        <strong>${time} &middot; ${m.total_calories} kcal${tagsText}</strong>
+        <strong>${time} &middot; ${m.total_calories} kcal</strong>
         <div class="meal-actions">
           <button data-action="edit" data-index="${i}">Edit</button>
           <button data-action="delete" data-index="${i}" class="danger">Delete</button>
         </div>
       </div>
+      ${tagsHtml}
       <div class="items">${itemsText}</div>
     </div>`;
   }
@@ -604,7 +623,7 @@
     return `<div class="meal edit-form" data-index="${i}">
       <div class="items-list">${m.items.map(itemRowHtml).join("")}</div>
       <button type="button" class="add-item-btn" data-action="add-item">+ Add item</button>
-      <div class="hint">Type your own calorie value, or tap &#8635; to recalculate from the name/quantity.</div>
+      <div class="hint">Type your own calorie value, or edit the description and tap &#8635; to recalculate.</div>
       <div class="edit-total">Total: <span data-role="edit-total-value">${total}</span> kcal</div>
       <label style="margin-top:8px;">Tags (comma separated)</label>
       <input class="tags-field" type="text" data-role="tags" value="${m.tags.join(", ")}" />
@@ -621,7 +640,6 @@
       dayDetail.style.display = "block";
       document.getElementById("day-total").textContent = `${dateStr}: no meals logged`;
       document.getElementById("day-total").className = "day-total";
-      document.getElementById("day-tags").innerHTML = "";
       document.getElementById("day-meals").innerHTML = "";
       dayDetail.dataset.date = dateStr;
       return;
@@ -631,11 +649,6 @@
     const totalEl = document.getElementById("day-total");
     totalEl.textContent = `${dateStr}: ${entry.total_calories} / ${settings.daily_limit} kcal`;
     totalEl.className = "day-total " + (over ? "over" : "under");
-
-    const allTags = [...new Set(entry.meals.flatMap((m) => m.tags))];
-    document.getElementById("day-tags").innerHTML = allTags
-      .map((t) => `<span class="tag-chip">${t}</span>`)
-      .join("");
 
     document.getElementById("day-meals").innerHTML = entry.meals
       .map((m, i) => (editingIndex === i ? renderMealEdit(m, i) : renderMealView(m, i)))
@@ -691,10 +704,9 @@
       updateEditTotal(form);
     } else if (btn.dataset.action === "recalc-item") {
       const row = btn.closest(".item-row");
-      const name = row.querySelector('[data-role="name"]').value.trim();
-      const quantity = row.querySelector('[data-role="quantity"]').value.trim();
-      if (!name) {
-        alert("Enter a name first.");
+      const description = row.querySelector('[data-role="description"]').value.trim();
+      if (!description) {
+        alert("Enter a description first.");
         return;
       }
       const originalLabel = btn.innerHTML;
@@ -705,7 +717,7 @@
         const res = await fetch(WORKER_URL + "/estimate-item", {
           method: "POST",
           headers: { "Content-Type": "application/json", "X-App-Secret": secret },
-          body: JSON.stringify({ description: [quantity, name].filter(Boolean).join(" ") }),
+          body: JSON.stringify({ description }),
         });
         if (res.status === 401) {
           localStorage.removeItem("meal-tracker-secret");
@@ -714,6 +726,8 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to estimate");
         row.querySelector('[data-role="calories"]').value = data.calories;
+        row.dataset.unitLabel = data.unit_label || "";
+        row.dataset.unitCalories = data.unit_calories != null ? data.unit_calories : "";
         updateEditTotal(row.closest(".edit-form"));
       } catch (err) {
         alert("Error: " + err.message);
@@ -724,11 +738,20 @@
     } else if (btn.dataset.action === "save") {
       const form = btn.closest(".edit-form");
       const items = [...form.querySelectorAll(".item-row")]
-        .map((row) => ({
-          name: row.querySelector('[data-role="name"]').value.trim(),
-          quantity: row.querySelector('[data-role="quantity"]').value.trim(),
-          calories: Number(row.querySelector('[data-role="calories"]').value) || 0,
-        }))
+        .map((row) => {
+          const description = row.querySelector('[data-role="description"]').value.trim();
+          const calories = Number(row.querySelector('[data-role="calories"]').value) || 0;
+          const unitCaloriesRaw = row.dataset.unitCalories;
+          const unitCalories =
+            unitCaloriesRaw !== "" && unitCaloriesRaw != null ? Number(unitCaloriesRaw) : calories;
+          return {
+            name: description,
+            quantity: "",
+            calories,
+            unit_label: row.dataset.unitLabel || description,
+            unit_calories: unitCalories,
+          };
+        })
         .filter((it) => it.name);
       const tagsText = form.querySelector('[data-role="tags"]').value;
       if (!items.length) {

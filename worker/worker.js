@@ -106,8 +106,12 @@ const MEAL_JSON_SCHEMA = {
 
 const ITEM_CALORIE_SCHEMA = {
   type: "object",
-  properties: { calories: { type: "number" } },
-  required: ["calories"],
+  properties: {
+    calories: { type: "number" },
+    unit_label: { type: "string" },
+    unit_calories: { type: "number" },
+  },
+  required: ["calories", "unit_label", "unit_calories"],
 };
 
 function corsHeaders(origin) {
@@ -194,6 +198,28 @@ function extractMealJson(result, errorHint) {
     throw new Error(`Model response was missing required fields - ${errorHint}`);
   }
 
+  // Workers AI JSON Mode is not a 100% guarantee, especially on a "fast" model
+  // under a schema with several required fields per item - fill in sensible
+  // defaults for anything missing/malformed rather than failing the whole
+  // request or silently showing blank info.
+  parsed.items = parsed.items.map((it) => {
+    const calories = typeof it.calories === "number" ? it.calories : 0;
+    return {
+      name: it.name || "item",
+      quantity: it.quantity || "",
+      calories,
+      unit_label: it.unit_label || it.quantity || it.name || "item",
+      unit_calories: typeof it.unit_calories === "number" ? it.unit_calories : calories,
+    };
+  });
+
+  if (!Array.isArray(parsed.tags)) parsed.tags = [];
+
+  if (!parsed.reply || !String(parsed.reply).trim()) {
+    const summary = parsed.items.map((it) => it.name).join(", ");
+    parsed.reply = `Logged ${summary} — ${Math.round(parsed.total_calories)} kcal total.`;
+  }
+
   return parsed;
 }
 
@@ -267,9 +293,13 @@ async function handleEstimateItem(request, env, origin) {
       {
         role: "system",
         content:
-          "Estimate a reasonable calorie count for the single food item described, using " +
+          "Estimate a reasonable calorie count for the single food item described (it may " +
+          "include a quantity or weight, e.g. '300g blueberries' or '5.5 eggs'), using " +
           "standard nutritional knowledge. If the quantity is vague, assume a typical " +
-          "single serving.",
+          "single serving. Also report 'unit_label' (a short description of one natural " +
+          "unit, no leading number or article, e.g. 'egg', '100g') and 'unit_calories' " +
+          "(that one unit's calories) - if the description already is one natural unit, " +
+          "unit_calories should equal calories.",
       },
       { role: "user", content: description },
     ],
@@ -290,7 +320,16 @@ async function handleEstimateItem(request, env, origin) {
     return jsonResponse({ error: "Couldn't estimate that - try a clearer description." }, 502, origin);
   }
 
-  return jsonResponse({ calories: Math.round(parsed.calories) }, 200, origin);
+  const calories = Math.round(parsed.calories);
+  return jsonResponse(
+    {
+      calories,
+      unit_label: parsed.unit_label || description,
+      unit_calories: typeof parsed.unit_calories === "number" ? Math.round(parsed.unit_calories) : calories,
+    },
+    200,
+    origin
+  );
 }
 
 function normalizeTags(value) {
