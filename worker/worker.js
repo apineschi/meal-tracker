@@ -44,10 +44,13 @@ const VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct";
 
 const CALORIE_SYSTEM_PROMPT =
   "You are a calorie-logging assistant. The user will describe a meal in free text, " +
-  "possibly including tags like 'lunch' or 'vegetarian'. Break it into individual food " +
-  "items, estimate reasonable calorie values per item using standard nutritional knowledge, " +
-  "sum the total, and extract any tags (lowercase). If quantities are vague, assume a " +
-  "typical single serving.\n\n" +
+  "possibly including tags like 'lunch' or 'vegetarian'. Break it into individual DISTINCT " +
+  "food items, estimate reasonable calorie values per item using standard nutritional " +
+  "knowledge, sum the total, and extract any tags (lowercase). If quantities are vague, " +
+  "assume a typical single serving.\n\n" +
+  "If the same food appears multiple times or in a count (e.g. '5 eggs', '3 cookies'), " +
+  "report it as ONE item with that count in 'quantity' and 'calories' equal to the total for " +
+  "all of them combined - never repeat the same food as separate item entries.\n\n" +
   "Fractions and portions apply ONLY to the specific item they're stated next to, never to " +
   "the whole message. '1/3 of 200g blueberries, one empanada' means: blueberries effective " +
   "quantity is about 67g (1/3 of 200g) - estimate calories for that reduced amount only - " +
@@ -78,8 +81,11 @@ const PHOTO_SYSTEM_PROMPT =
   "would from a typed description.\n\n" +
   "If you can't find a matching dish or clear serving info, say so honestly in 'reply' and " +
   "still make a best-effort single-item estimate rather than failing.\n\n" +
-  "Break the result into individual items (usually just one dish, or its listed components " +
-  "if useful), extract any tags, and respond via the required JSON shape. For each item, " +
+  "Break the result into individual DISTINCT items (usually just one dish, or its listed " +
+  "components if useful) - if something is counted or repeated (e.g. '3 tacos'), report it " +
+  "as ONE item with that count in 'quantity' and 'calories' for all of them combined, never " +
+  "as separate repeated entries. Extract any tags, and respond via the required JSON shape. " +
+  "For each item, " +
   "also report 'unit_label' (a short description of one natural unit, no leading number or " +
   "article, e.g. 'taco', '100g') and 'unit_calories' (that unit's calories) - if the item is " +
   "already a single natural unit, unit_calories should just equal calories. 'reply' should " +
@@ -222,6 +228,26 @@ function extractMealJson(result, errorHint) {
     };
   });
 
+  // Safety net for the same failure mode the system prompt already asks the
+  // model to avoid ("5 eggs" coming back as five separate "egg" entries
+  // instead of one item with quantity "5") - collapse duplicate names into
+  // one combined entry rather than trusting the instruction was followed.
+  const merged = new Map();
+  for (const it of parsed.items) {
+    const key = it.name.toLowerCase();
+    if (merged.has(key)) {
+      const existing = merged.get(key);
+      existing.calories += it.calories;
+      existing._count += 1;
+    } else {
+      merged.set(key, { ...it, _count: 1 });
+    }
+  }
+  parsed.items = [...merged.values()].map(({ _count, ...it }) => {
+    if (_count > 1 && !it.quantity) it.quantity = String(_count);
+    return it;
+  });
+
   if (!Array.isArray(parsed.tags)) parsed.tags = [];
 
   if (!parsed.reply || !String(parsed.reply).trim()) {
@@ -232,15 +258,47 @@ function extractMealJson(result, errorHint) {
   return parsed;
 }
 
-async function usdaSearch(env, query, dataType) {
+async function usdaSearchList(env, query, dataType) {
   let url =
     `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${env.USDA_API_KEY}` +
-    `&query=${encodeURIComponent(query)}&pageSize=3`;
+    `&query=${encodeURIComponent(query)}&pageSize=5`;
   if (dataType) url += `&dataType=${encodeURIComponent(dataType)}`;
   const res = await fetch(url);
-  if (!res.ok) return null;
+  if (!res.ok) return [];
   const data = await res.json();
-  return (data.foods && data.foods[0]) || null;
+  return data.foods || [];
+}
+
+// FDC often splits a plain food into separate component/variant records (egg
+// -> "egg white" / "egg yolk" / "egg substitute", milk -> "dry milk", chicken
+// -> "chicken gizzard") that can rank above the plain whole-food entry in
+// search results. If the description names a component/variant the user's
+// own query didn't ask for, it's very likely the wrong match even though its
+// calorie value alone looks perfectly plausible.
+const USDA_COMPONENT_QUALIFIERS = [
+  "white", "yolk", "substitute", "powder", "dried", "dry", "shell", "gizzard", "liver", "skin",
+];
+
+function isPlausibleMatch(query, description) {
+  const q = query.toLowerCase();
+  const d = description.toLowerCase();
+  return !USDA_COMPONENT_QUALIFIERS.some((word) => d.includes(word) && !q.includes(word));
+}
+
+function pickBestFood(query, foods) {
+  for (const food of foods) {
+    if (!isPlausibleMatch(query, food.description)) continue;
+    const kcal = extractKcalPer100g(food);
+    if (kcal != null) return { food, kcal };
+  }
+  // Nothing both well-matched and plausible - fall back to the first
+  // plausible-calorie result even with a mismatched qualifier, rather than
+  // giving up on grounding this item entirely.
+  for (const food of foods) {
+    const kcal = extractKcalPer100g(food);
+    if (kcal != null) return { food, kcal };
+  }
+  return null;
 }
 
 async function lookupUsdaFood(env, query) {
@@ -252,16 +310,14 @@ async function lookupUsdaFood(env, query) {
     // Generic/raw foods (Foundation, SR Legacy) first - much better match for
     // typical logged ingredients than packaged "Branded" products. Fall back
     // to the full catalog (including Branded) if nothing generic turns up.
-    let food = await usdaSearch(env, query, "Foundation,SR Legacy");
-    let kcal = food ? extractKcalPer100g(food) : null;
-    if (kcal == null) {
-      food = await usdaSearch(env, query, null);
-      kcal = food ? extractKcalPer100g(food) : null;
+    let best = pickBestFood(query, await usdaSearchList(env, query, "Foundation,SR Legacy"));
+    if (!best) {
+      best = pickBestFood(query, await usdaSearchList(env, query, null));
     }
-    if (kcal == null) return null;
+    if (!best) return null;
 
-    console.log(`USDA match for "${query}": "${food.description}" = ${kcal} kcal/100g`);
-    return { description: food.description, kcalPer100g: kcal, fdcId: food.fdcId };
+    console.log(`USDA match for "${query}": "${best.food.description}" = ${best.kcal} kcal/100g`);
+    return { description: best.food.description, kcalPer100g: best.kcal, fdcId: best.food.fdcId };
   } catch (err) {
     console.error("USDA lookup failed", err);
     return null;
