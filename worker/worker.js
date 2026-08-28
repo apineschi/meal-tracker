@@ -92,6 +92,12 @@ const MEAL_JSON_SCHEMA = {
   required: ["items", "total_calories", "tags", "reply"],
 };
 
+const ITEM_CALORIE_SCHEMA = {
+  type: "object",
+  properties: { calories: { type: "number" } },
+  required: ["calories"],
+};
+
 function corsHeaders(origin) {
   return {
     "Access-Control-Allow-Origin": origin,
@@ -238,6 +244,43 @@ async function handleSettings(request, env, origin) {
   return jsonResponse({ daily_limit: dailyLimit }, 200, origin);
 }
 
+async function handleEstimateItem(request, env, origin) {
+  const { description } = await request.json();
+  if (!description || typeof description !== "string") {
+    return jsonResponse({ error: "Missing 'description' field" }, 400, origin);
+  }
+
+  const result = await env.AI.run(AI_MODEL, {
+    messages: [
+      {
+        role: "system",
+        content:
+          "Estimate a reasonable calorie count for the single food item described, using " +
+          "standard nutritional knowledge. If the quantity is vague, assume a typical " +
+          "single serving.",
+      },
+      { role: "user", content: description },
+    ],
+    response_format: { type: "json_schema", json_schema: ITEM_CALORIE_SCHEMA },
+  });
+
+  let parsed = result && result.response;
+  if (typeof parsed === "string") {
+    const match = parsed.match(/\{[\s\S]*\}/);
+    try {
+      parsed = match ? JSON.parse(match[0]) : null;
+    } catch (err) {
+      parsed = null;
+    }
+  }
+
+  if (!parsed || typeof parsed.calories !== "number") {
+    return jsonResponse({ error: "Couldn't estimate that - try a clearer description." }, 502, origin);
+  }
+
+  return jsonResponse({ calories: Math.round(parsed.calories) }, 200, origin);
+}
+
 function normalizeTags(value) {
   if (Array.isArray(value)) {
     return value.map((t) => String(t).trim().toLowerCase()).filter(Boolean);
@@ -382,6 +425,7 @@ const ROUTES = {
   "/settings": handleSettings,
   "/edit-meal": handleEditMeal,
   "/delete-meal": handleDeleteMeal,
+  "/estimate-item": handleEstimateItem,
 };
 
 export default {

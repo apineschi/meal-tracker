@@ -141,15 +141,50 @@
   }
   .meal-actions button.danger { color: var(--over); border-color: #f3c6c1; }
 
-  .edit-form textarea {
-    width: 100%;
-    min-height: 70px;
-    font-family: ui-monospace, monospace;
-    font-size: 12px;
-    padding: 8px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
+  .edit-form .item-row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
     margin-top: 6px;
+  }
+  .edit-form .item-row input[data-role="name"] { flex: 2; min-width: 0; }
+  .edit-form .item-row input[data-role="quantity"] { flex: 1; min-width: 0; }
+  .edit-form .item-row input[data-role="calories"] { flex: 1; min-width: 0; }
+  .edit-form .item-row input {
+    padding: 6px 7px;
+    font-size: 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  .edit-form .item-row button {
+    flex-shrink: 0;
+    padding: 6px 8px;
+    font-size: 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: white;
+  }
+  .edit-form .item-row button.recalc { color: var(--accent); }
+  .edit-form .item-row button.remove { color: var(--over); }
+  .edit-form .add-item-btn {
+    margin-top: 8px;
+    width: 100%;
+    padding: 7px;
+    border-radius: 8px;
+    border: 1px dashed var(--border);
+    background: none;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .edit-form .edit-total {
+    margin-top: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .edit-form .tags-field {
+    width: 100%;
+    margin-top: 4px;
   }
   .edit-form .hint { font-size: 11px; color: var(--muted); margin-top: 3px; }
   .edit-form .row { display: flex; gap: 8px; margin-top: 8px; }
@@ -171,7 +206,8 @@
   .add-meal input[type="text"] { margin-bottom: 6px; }
   .add-meal textarea {
     width: 100%;
-    min-height: 50px;
+    min-height: 80px;
+    max-height: 35vh;
     padding: 8px;
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -189,6 +225,50 @@
     font-size: 13px;
   }
   #add-meal-status { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .add-meal .meal-type-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+  .add-meal .meal-type-row button {
+    flex: 1;
+    min-width: 55px;
+    width: auto;
+    background: white;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    padding: 6px 4px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .add-meal .meal-type-row button.selected { background: var(--accent); color: white; }
+
+  .add-meal .photo-row { display: flex; gap: 8px; margin-bottom: 6px; }
+  .add-meal .photo-row textarea { margin-bottom: 0; }
+  .add-meal .photo-row button {
+    width: auto;
+    flex-shrink: 0;
+    padding: 0 12px;
+    background: white;
+    color: var(--accent);
+    border: 1px solid var(--border);
+    font-size: 16px;
+  }
+  .add-meal .photo-preview { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .add-meal .photo-preview.hidden { display: none; }
+  .add-meal .photo-preview img {
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .add-meal .photo-preview button {
+    width: auto;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--over);
+    padding: 6px 10px;
+    font-size: 11px;
+  }
 
   .day-total {
     font-weight: 600;
@@ -305,8 +385,23 @@
     <div id="day-meals"></div>
     <div class="add-meal">
       <label>Add a meal to this day</label>
-      <input type="text" id="add-meal-tags" placeholder="Tags (comma separated)" />
-      <textarea id="add-meal-text" placeholder="e.g. 2 eggs, toast with butter"></textarea>
+      <div class="meal-type-row" id="add-meal-type-row">
+        <button type="button" data-type="breakfast">Breakfast</button>
+        <button type="button" data-type="lunch">Lunch</button>
+        <button type="button" data-type="dinner">Dinner</button>
+        <button type="button" data-type="snack">Snack</button>
+        <button type="button" data-type="drink">Drink</button>
+      </div>
+      <input type="text" id="add-meal-tags" placeholder="Other tags (comma separated)" />
+      <div class="photo-preview hidden" id="add-meal-photo-preview">
+        <img id="add-meal-photo-preview-img" alt="Selected photo" />
+        <button type="button" id="add-meal-photo-remove">Remove photo</button>
+      </div>
+      <div class="photo-row">
+        <button type="button" id="add-meal-photo-btn" title="Add a photo of a nutrition label or menu">📷</button>
+        <textarea id="add-meal-text" placeholder="e.g. 2 eggs, toast with butter (or add a photo)"></textarea>
+      </div>
+      <input type="file" id="add-meal-photo-file" accept="image/*" style="display:none" />
       <button id="add-meal-btn">Log meal</button>
       <div id="add-meal-status"></div>
     </div>
@@ -458,20 +553,26 @@
     }
   }
 
-  function itemsToLines(items) {
-    return items.map((i) => `${i.name} | ${i.quantity || ""} | ${i.calories}`).join("\n");
+  function itemRowHtml(item) {
+    const name = (item.name || "").replace(/"/g, "&quot;");
+    const quantity = (item.quantity || "").replace(/"/g, "&quot;");
+    const calories = item.calories != null ? item.calories : "";
+    return `<div class="item-row">
+      <input type="text" data-role="name" placeholder="Name" value="${name}" />
+      <input type="text" data-role="quantity" placeholder="Qty" value="${quantity}" />
+      <input type="number" data-role="calories" placeholder="kcal" value="${calories}" />
+      <button type="button" class="recalc" data-action="recalc-item" title="Recalculate from name/quantity">&#8635;</button>
+      <button type="button" class="remove" data-action="remove-item" title="Remove item">&times;</button>
+    </div>`;
   }
 
-  function parseItemLines(text) {
-    return text
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const [name, quantity, calories] = line.split("|").map((p) => (p || "").trim());
-        return { name, quantity, calories: Number(calories) || 0 };
-      })
-      .filter((i) => i.name);
+  function updateEditTotal(formEl) {
+    const total = [...formEl.querySelectorAll('[data-role="calories"]')].reduce(
+      (sum, inp) => sum + (Number(inp.value) || 0),
+      0
+    );
+    const totalEl = formEl.querySelector('[data-role="edit-total-value"]');
+    if (totalEl) totalEl.textContent = total;
   }
 
   function renderMealView(m, i) {
@@ -491,12 +592,14 @@
   }
 
   function renderMealEdit(m, i) {
-    return `<div class="meal edit-form">
-      <label>Items (one per line: name | quantity | calories)</label>
-      <textarea data-role="items" data-index="${i}">${itemsToLines(m.items)}</textarea>
-      <div class="hint">Total recalculates automatically from these calorie values.</div>
+    const total = m.items.reduce((sum, it) => sum + (it.calories || 0), 0);
+    return `<div class="meal edit-form" data-index="${i}">
+      <div class="items-list">${m.items.map(itemRowHtml).join("")}</div>
+      <button type="button" class="add-item-btn" data-action="add-item">+ Add item</button>
+      <div class="hint">Type your own calorie value, or tap &#8635; to recalculate from the name/quantity.</div>
+      <div class="edit-total">Total: <span data-role="edit-total-value">${total}</span> kcal</div>
       <label style="margin-top:8px;">Tags (comma separated)</label>
-      <input type="text" data-role="tags" data-index="${i}" value="${m.tags.join(", ")}" />
+      <input class="tags-field" type="text" data-role="tags" value="${m.tags.join(", ")}" />
       <div class="row">
         <button class="save" data-action="save" data-index="${i}">Save</button>
         <button class="cancel" data-action="cancel" data-index="${i}">Cancel</button>
@@ -571,11 +674,55 @@
       } catch (err) {
         alert("Error: " + err.message);
       }
+    } else if (btn.dataset.action === "add-item") {
+      const list = btn.closest(".edit-form").querySelector(".items-list");
+      list.insertAdjacentHTML("beforeend", itemRowHtml({ name: "", quantity: "", calories: "" }));
+    } else if (btn.dataset.action === "remove-item") {
+      const form = btn.closest(".edit-form");
+      btn.closest(".item-row").remove();
+      updateEditTotal(form);
+    } else if (btn.dataset.action === "recalc-item") {
+      const row = btn.closest(".item-row");
+      const name = row.querySelector('[data-role="name"]').value.trim();
+      const quantity = row.querySelector('[data-role="quantity"]').value.trim();
+      if (!name) {
+        alert("Enter a name first.");
+        return;
+      }
+      const originalLabel = btn.innerHTML;
+      btn.disabled = true;
+      btn.textContent = "…";
+      try {
+        const secret = await ensureAppSecret();
+        const res = await fetch(WORKER_URL + "/estimate-item", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-App-Secret": secret },
+          body: JSON.stringify({ description: [quantity, name].filter(Boolean).join(" ") }),
+        });
+        if (res.status === 401) {
+          localStorage.removeItem("meal-tracker-secret");
+          throw new Error("Wrong password, try again.");
+        }
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to estimate");
+        row.querySelector('[data-role="calories"]').value = data.calories;
+        updateEditTotal(row.closest(".edit-form"));
+      } catch (err) {
+        alert("Error: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalLabel;
+      }
     } else if (btn.dataset.action === "save") {
       const form = btn.closest(".edit-form");
-      const itemsText = form.querySelector('[data-role="items"]').value;
+      const items = [...form.querySelectorAll(".item-row")]
+        .map((row) => ({
+          name: row.querySelector('[data-role="name"]').value.trim(),
+          quantity: row.querySelector('[data-role="quantity"]').value.trim(),
+          calories: Number(row.querySelector('[data-role="calories"]').value) || 0,
+        }))
+        .filter((it) => it.name);
       const tagsText = form.querySelector('[data-role="tags"]').value;
-      const items = parseItemLines(itemsText);
       if (!items.length) {
         alert("Enter at least one item.");
         return;
@@ -612,15 +759,89 @@
     }
   });
 
+  document.getElementById("day-meals").addEventListener("input", (e) => {
+    if (e.target.matches('[data-role="calories"]')) {
+      updateEditTotal(e.target.closest(".edit-form"));
+    }
+  });
+
+  const addMealTypeRow = document.getElementById("add-meal-type-row");
+  let addMealSelectedType = null;
+
+  addMealTypeRow.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-type]");
+    if (!btn) return;
+    const isSame = btn.dataset.type === addMealSelectedType;
+    addMealTypeRow.querySelectorAll("button").forEach((b) => b.classList.remove("selected"));
+    addMealSelectedType = isSame ? null : btn.dataset.type;
+    if (addMealSelectedType) btn.classList.add("selected");
+  });
+
+  const addMealPhotoBtn = document.getElementById("add-meal-photo-btn");
+  const addMealPhotoFile = document.getElementById("add-meal-photo-file");
+  const addMealPhotoPreview = document.getElementById("add-meal-photo-preview");
+  const addMealPhotoPreviewImg = document.getElementById("add-meal-photo-preview-img");
+  const addMealPhotoRemove = document.getElementById("add-meal-photo-remove");
+  let addMealSelectedPhoto = null;
+
+  function resizeImage(file, maxDim, quality) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > height && width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        };
+        img.onerror = reject;
+        img.src = reader.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  addMealPhotoBtn.addEventListener("click", () => addMealPhotoFile.click());
+
+  addMealPhotoFile.addEventListener("change", async () => {
+    const file = addMealPhotoFile.files[0];
+    if (!file) return;
+    try {
+      addMealSelectedPhoto = await resizeImage(file, 1024, 0.7);
+      addMealPhotoPreviewImg.src = addMealSelectedPhoto;
+      addMealPhotoPreview.classList.remove("hidden");
+    } catch (err) {
+      alert("Couldn't read that photo, please try again.");
+    }
+  });
+
+  addMealPhotoRemove.addEventListener("click", () => {
+    addMealSelectedPhoto = null;
+    addMealPhotoFile.value = "";
+    addMealPhotoPreview.classList.add("hidden");
+  });
+
   document.getElementById("add-meal-btn").addEventListener("click", async () => {
     const dateStr = dayDetail.dataset.date;
     const textEl = document.getElementById("add-meal-text");
     const tagsEl = document.getElementById("add-meal-tags");
     const statusEl = document.getElementById("add-meal-status");
     const text = textEl.value.trim();
-    const tags = tagsEl.value.trim();
-    if (!dateStr || !text) {
-      statusEl.textContent = "Enter a description first.";
+    const tags = [tagsEl.value.trim(), addMealSelectedType].filter(Boolean).join(", ");
+    const photoToSend = addMealSelectedPhoto;
+    if (!dateStr || (!text && !photoToSend)) {
+      statusEl.textContent = "Enter a description or add a photo first.";
       return;
     }
 
@@ -630,7 +851,7 @@
       const res = await fetch(WORKER_URL + "/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-App-Secret": secret },
-        body: JSON.stringify({ text, tags, localDate: dateStr }),
+        body: JSON.stringify({ text, image: photoToSend, tags, localDate: dateStr }),
       });
       if (res.status === 401) {
         localStorage.removeItem("meal-tracker-secret");
@@ -642,7 +863,7 @@
       if (!log[dateStr]) log[dateStr] = { meals: [], total_calories: 0 };
       log[dateStr].meals.push({
         time: new Date().toISOString(),
-        raw_input: text,
+        raw_input: text || (photoToSend ? "(photo)" : ""),
         items: data.items,
         tags: data.tags || [],
         total_calories: data.meal_total,
@@ -651,6 +872,11 @@
 
       textEl.value = "";
       tagsEl.value = "";
+      addMealTypeRow.querySelectorAll("button").forEach((b) => b.classList.remove("selected"));
+      addMealSelectedType = null;
+      addMealSelectedPhoto = null;
+      addMealPhotoFile.value = "";
+      addMealPhotoPreview.classList.add("hidden");
       statusEl.textContent = "Logged.";
       renderCalendar();
       renderDayDetail(dateStr);
