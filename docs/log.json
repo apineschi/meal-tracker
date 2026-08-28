@@ -47,24 +47,27 @@
         "from_photo": false,
         "items": [
           {
-            "calories": 36,
-            "name": "half a stick of butter"
+            "name": "half a stick of butter",
+            "quantity": "",
+            "calories": 36
           },
           {
-            "calories": 378,
-            "name": "6 eggs"
+            "name": "6 eggs",
+            "quantity": "5",
+            "calories": 360
           },
           {
-            "calories": 120,
-            "name": "a chocolate chip cookie from caffe nero"
+            "name": "a chocolate chip cookie from caffe nero",
+            "quantity": "",
+            "calories": 120
           }
         ],
         "tags": [
           "snack"
         ],
-        "total_calories": 534
+        "total_calories": 516
       }
     ],
-    "total_calories": 534
+    "total_calories": 516
   }
 }
