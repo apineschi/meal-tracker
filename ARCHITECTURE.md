@@ -157,12 +157,27 @@ runs a second pass: after the model's first attempt at parsing a text
 message into items, each item's `name` is looked up via
 `lookupUsdaFood()` against FoodData Central's Foundation/SR Legacy datasets
 (generic/raw foods — falls back to the full catalog including Branded
-products if nothing generic matches). Any real "kcal per 100g" facts found
-are handed back to the model in a second call, which recomputes the total
-using those authoritative numbers instead of memory, converting to whatever
-quantity was actually logged (e.g. scaling "143 kcal per 100g" to the real
-weight eaten) — the arithmetic and unit conversion stay inside the model's
-own reasoning, only the base nutrition fact is externally sourced.
+products if nothing generic matches, and rejects matches whose description
+names a component/variant the query didn't ask for, e.g. "egg" won't accept
+"egg white"). Any real "kcal per 100g" facts found are handed back to the
+model in a second call for a refined pass.
+
+**The actual calorie arithmetic happens in code, not inside the model.**
+Earlier versions asked the model to convert "kcal per 100g" to the real
+quantity itself, which proved unreliable — it would treat "100g" as if it
+were one whole unit regardless of the food's real size, e.g. computing "5
+eggs" as `5 × (kcal per 100g)` instead of scaling by an actual egg's ~50g
+weight, overestimating by roughly 2x. Instead, each item's schema includes
+`estimated_gram_weight` — the model's best real-world guess at how much the
+*stated quantity* actually weighs (something models are reasonably good at;
+arithmetic under structured-output constraints is what they're bad at). The
+post-processing step in `callWorkersAI()` then computes
+`calories = kcalPer100g × estimated_gram_weight ÷ 100` directly, and derives
+`unit_calories` by dividing that total by a count parsed from `quantity` when
+one exists. An explicit gram quantity in the message itself (e.g. "300g")
+is trusted over the model's estimate, since there's nothing to estimate in
+that case. The meal's `total_calories` is recomputed as the sum of all items
+afterward, so it always stays consistent with whatever got overridden.
 
 This is a pure accuracy improvement layered on top of the existing flow,
 never a dependency: `USDA_API_KEY` unset, a lookup finding no match, or the

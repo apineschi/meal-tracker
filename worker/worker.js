@@ -64,6 +64,12 @@ const CALORIE_SYSTEM_PROMPT =
   "serving size like a tablespoon or 100g for things measured in bulk). If the logged " +
   "quantity already IS one natural unit (e.g. 'a banana'), unit_calories should just equal " +
   "calories and unit_label should describe that single item.\n\n" +
+  "Also report 'estimated_gram_weight': your best real-world estimate of the total weight in " +
+  "grams of the quantity actually stated for that item (e.g. '5 eggs' - about 250g total since " +
+  "one large egg is roughly 50g; '1 large tomato' - about 150g; if a weight is already given " +
+  "like '300g blueberries', just use that number). This is used to cross-check your calorie " +
+  "math against reference nutrition data, so estimate it carefully using real-world knowledge " +
+  "of how much that quantity of that food actually weighs - do not skip or guess randomly.\n\n" +
   "'reply' should be a short, friendly one-to-two sentence confirmation of what was logged " +
   "and its total calories - do not mention the daily total there, that is appended separately.";
 
@@ -88,9 +94,11 @@ const PHOTO_SYSTEM_PROMPT =
   "For each item, " +
   "also report 'unit_label' (a short description of one natural unit, no leading number or " +
   "article, e.g. 'taco', '100g') and 'unit_calories' (that unit's calories) - if the item is " +
-  "already a single natural unit, unit_calories should just equal calories. 'reply' should " +
-  "be a short, friendly one-to-two sentence confirmation - do not mention the daily total, " +
-  "that is appended separately.";
+  "already a single natural unit, unit_calories should just equal calories. Also report " +
+  "'estimated_gram_weight': your best real-world estimate of the total weight in grams of the " +
+  "quantity actually stated (e.g. '3 tacos' - about 300g total). 'reply' should be a short, " +
+  "friendly one-to-two sentence confirmation - do not mention the daily total, that is " +
+  "appended separately.";
 
 // Enforced via response_format below (Workers AI "JSON Mode") rather than
 // hoping the model follows a text instruction - much more reliable, though
@@ -108,8 +116,9 @@ const MEAL_JSON_SCHEMA = {
           calories: { type: "number" },
           unit_label: { type: "string" },
           unit_calories: { type: "number" },
+          estimated_gram_weight: { type: "number" },
         },
-        required: ["name", "calories", "unit_label", "unit_calories"],
+        required: ["name", "calories", "unit_label", "unit_calories", "estimated_gram_weight"],
       },
     },
     total_calories: { type: "number" },
@@ -225,6 +234,7 @@ function extractMealJson(result, errorHint) {
       calories,
       unit_label: it.unit_label || it.quantity || it.name || "item",
       unit_calories: typeof it.unit_calories === "number" ? it.unit_calories : calories,
+      estimated_gram_weight: typeof it.estimated_gram_weight === "number" ? it.estimated_gram_weight : null,
     };
   });
 
@@ -238,6 +248,9 @@ function extractMealJson(result, errorHint) {
     if (merged.has(key)) {
       const existing = merged.get(key);
       existing.calories += it.calories;
+      if (existing.estimated_gram_weight != null && it.estimated_gram_weight != null) {
+        existing.estimated_gram_weight += it.estimated_gram_weight;
+      }
       existing._count += 1;
     } else {
       merged.set(key, { ...it, _count: 1 });
@@ -353,6 +366,16 @@ async function runCalorieModel(env, systemPrompt, message) {
   return extractMealJson(result, "try rephrasing your message.");
 }
 
+function parseGrams(quantity) {
+  const m = String(quantity || "").trim().match(/^([\d.]+)\s*g(rams?)?$/i);
+  return m ? parseFloat(m[1]) : null;
+}
+
+function parseCount(quantity) {
+  const m = String(quantity || "").trim().match(/^([\d.]+)$/);
+  return m ? parseFloat(m[1]) : null;
+}
+
 async function callWorkersAI(env, message) {
   const firstPass = await runCalorieModel(env, CALORIE_SYSTEM_PROMPT, message);
 
@@ -393,17 +416,43 @@ async function callWorkersAI(env, message) {
   // Tag whichever items in the final result correspond to a USDA fact we
   // looked up, so the front end can show the reader what was actually used
   // ("(USDA)") rather than presenting every number as equally sourced.
+  //
+  // Also recompute calories/unit_calories ourselves rather than trusting the
+  // model's "convert 100g to the real quantity" math - that conversion has
+  // proven unreliable in practice (it tends to treat "kcal per 100g" as if
+  // 100g were one whole unit, badly overestimating a food that's actually
+  // much lighter per piece, e.g. a ~50g egg). The model is asked for
+  // 'estimated_gram_weight' (a plain real-world weight guess, which models
+  // are decent at) instead, and the actual scaling arithmetic happens here
+  // in code, not inside the model's structured output.
   final.items = final.items.map((it) => {
     const food = factsByName.get(it.name.toLowerCase());
     if (!food) return it;
-    return {
+
+    const withSource = {
       ...it,
       usda_source: true,
       usda_food: food.description,
       usda_kcal_per_100g: Math.round(food.kcalPer100g),
       usda_url: food.fdcId ? `https://fdc.nal.usda.gov/food-details/${food.fdcId}/nutrients` : null,
     };
+
+    // An explicit gram quantity ("300g") is more trustworthy than the
+    // model's estimate, since there's nothing to estimate - use it first.
+    const explicitGrams = parseGrams(it.quantity);
+    const grams = explicitGrams != null ? explicitGrams : it.estimated_gram_weight;
+    if (typeof grams !== "number" || grams <= 0) return withSource;
+
+    const total = Math.round((food.kcalPer100g * grams) / 100);
+    const count = parseCount(it.quantity);
+    const unitCalories = count ? Math.round(total / count) : total;
+    const unitLabel = it.unit_label || (count ? it.name : "100g");
+
+    return { ...withSource, calories: total, unit_calories: unitCalories, unit_label: unitLabel };
   });
+
+  // Keep the meal total consistent with whatever just got overridden above.
+  final.total_calories = final.items.reduce((sum, it) => sum + it.calories, 0);
 
   return final;
 }
