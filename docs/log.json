@@ -48,70 +48,6 @@
         "total_calories": 405
       },
       {
-        "time": "2026-08-28T15:32:39.158Z",
-        "raw_input": "5 eggs",
-        "from_photo": false,
-        "items": [
-          {
-            "name": "egg",
-            "quantity": "",
-            "calories": 115.5,
-            "unit_label": "large egg",
-            "unit_calories": 55,
-            "usda_source": true,
-            "usda_food": "Eggs, Grade A, Large, egg white",
-            "usda_kcal_per_100g": 231,
-            "usda_url": "https://fdc.nal.usda.gov/food-details/747997/nutrients"
-          },
-          {
-            "name": "egg",
-            "quantity": "",
-            "calories": 115.5,
-            "unit_label": "large egg",
-            "unit_calories": 55,
-            "usda_source": true,
-            "usda_food": "Eggs, Grade A, Large, egg white",
-            "usda_kcal_per_100g": 231,
-            "usda_url": "https://fdc.nal.usda.gov/food-details/747997/nutrients"
-          },
-          {
-            "name": "egg",
-            "quantity": "",
-            "calories": 115.5,
-            "unit_label": "large egg",
-            "unit_calories": 55,
-            "usda_source": true,
-            "usda_food": "Eggs, Grade A, Large, egg white",
-            "usda_kcal_per_100g": 231,
-            "usda_url": "https://fdc.nal.usda.gov/food-details/747997/nutrients"
-          },
-          {
-            "name": "egg",
-            "quantity": "",
-            "calories": 115.5,
-            "unit_label": "large egg",
-            "unit_calories": 55,
-            "usda_source": true,
-            "usda_food": "Eggs, Grade A, Large, egg white",
-            "usda_kcal_per_100g": 231,
-            "usda_url": "https://fdc.nal.usda.gov/food-details/747997/nutrients"
-          },
-          {
-            "name": "egg",
-            "quantity": "",
-            "calories": 115.5,
-            "unit_label": "large egg",
-            "unit_calories": 55,
-            "usda_source": true,
-            "usda_food": "Eggs, Grade A, Large, egg white",
-            "usda_kcal_per_100g": 231,
-            "usda_url": "https://fdc.nal.usda.gov/food-details/747997/nutrients"
-          }
-        ],
-        "tags": [],
-        "total_calories": 578
-      },
-      {
         "time": "2026-08-28T15:39:39.461Z",
         "raw_input": "5 eggs",
         "from_photo": false,
@@ -301,7 +237,7 @@
         "total_calories": 320
       }
     ],
-    "total_calories": 4560
+    "total_calories": 3982
   },
   "2026-08-13": {
     "meals": [
