@@ -13,7 +13,7 @@
  * Required secrets (Worker Settings > Variables > "Encrypt" toggle on):
  *   GITHUB_TOKEN       - fine-grained PAT, scoped to ONLY the meal-tracker repo,
  *                        Contents: Read and write permission
- *   NTFY_TOPIC         - an unguessable slug, e.g. "apineschi-meals-8f2a1c"
+ *   NTFY_TOPIC         - an unguessable slug
  *   APP_SECRET         - a password only you know. The Worker's URL and this
  *                        file's source are visible to anyone who views the
  *                        GitHub Pages source, so without this check anyone
