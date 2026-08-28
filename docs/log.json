@@ -30,8 +30,31 @@
           "lunch"
         ],
         "total_calories": 329
+      },
+      {
+        "time": "2026-08-28T13:49:35.156Z",
+        "raw_input": "Large chicken thigh, 6 medium carrots, 1/3 head of broccoli",
+        "from_photo": false,
+        "items": [
+          {
+            "calories": 260,
+            "name": "chicken thigh"
+          },
+          {
+            "calories": 120,
+            "name": "6 medium carrots"
+          },
+          {
+            "calories": 55,
+            "name": "1/3 head of broccoli"
+          }
+        ],
+        "tags": [
+          "lunch"
+        ],
+        "total_calories": 435
       }
     ],
-    "total_calories": 329
+    "total_calories": 764
   }
 }
