@@ -48,39 +48,6 @@
         "total_calories": 405
       },
       {
-        "time": "2026-08-28T15:30:28.938Z",
-        "raw_input": "125g light mozarella, 3 medium tomatoes, 2 slices bread",
-        "from_photo": false,
-        "items": [
-          {
-            "name": "125 g light mozzarella",
-            "quantity": "",
-            "calories": 125,
-            "unit_label": "100g",
-            "unit_calories": 74
-          },
-          {
-            "name": "medium tomatoes",
-            "quantity": "",
-            "calories": 1047,
-            "unit_label": "100g",
-            "unit_calories": 349
-          },
-          {
-            "name": "bread",
-            "quantity": "",
-            "calories": 816,
-            "unit_label": "slice",
-            "unit_calories": 204
-          }
-        ],
-        "tags": [
-          "snack",
-          "vegetarian"
-        ],
-        "total_calories": 1988
-      },
-      {
         "time": "2026-08-28T15:32:39.158Z",
         "raw_input": "5 eggs",
         "from_photo": false,
@@ -334,7 +301,7 @@
         "total_calories": 320
       }
     ],
-    "total_calories": 6548
+    "total_calories": 4560
   },
   "2026-08-13": {
     "meals": [
