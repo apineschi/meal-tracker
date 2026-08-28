@@ -35,9 +35,39 @@
           "lunch"
         ],
         "total_calories": 437
+      },
+      {
+        "time": "2026-08-28T14:16:08.512Z",
+        "raw_input": "3/4 a head of brocoli, 1 medium chicken thigh with skin, 5 eggs",
+        "from_photo": false,
+        "items": [
+          {
+            "calories": 55,
+            "name": "broccoli",
+            "unit_calories": 55,
+            "unit_label": "100g"
+          },
+          {
+            "calories": 140,
+            "name": "chicken thigh",
+            "unit_calories": 140,
+            "unit_label": "medium chicken thigh with skin"
+          },
+          {
+            "calories": 350,
+            "name": "eggs",
+            "unit_calories": 70,
+            "unit_label": "egg"
+          }
+        ],
+        "tags": [
+          "meat",
+          "dinner"
+        ],
+        "total_calories": 545
       }
     ],
-    "total_calories": 437
+    "total_calories": 982
   },
   "2026-08-13": {
     "meals": [
