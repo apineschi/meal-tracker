@@ -3,7 +3,7 @@
 How this system is built and why. For setup and day-to-day changes, see
 [INSTRUCTIONS.md](INSTRUCTIONS.md) instead.
 
-## Design constraint: near-zero cost, mostly GitHub
+## Design constraint: genuinely $0, mostly GitHub
 
 Like the job-scraper project, the data store and dashboard are GitHub itself:
 a git-committed JSON file is the database, and GitHub Pages (serving `docs/`)
@@ -13,17 +13,27 @@ app has to respond to you in real time when you log a meal. GitHub Actions
 has no "respond to an HTTP request in under a second" mode; Cloudflare
 Workers' free tier (100k requests/day, no card required) does.
 
-The Worker is the only thing that ever holds secrets (your Anthropic API key,
-a GitHub token, your ntfy topic, your app password). Nothing secret ever
-touches `docs/`, because anything in `docs/` is public — view-source on the
-GitHub Pages site shows everyone the code, same as job-scraper's dashboard.
+Calorie parsing runs on **Cloudflare Workers AI** (an open-source model, bound
+directly into the Worker), not the Anthropic API — Anthropic has no free API
+tier, and per-request billing would violate the "$0" requirement. Workers AI's
+free daily allowance requires no card and, on Cloudflare's free Workers plan,
+requests past that allowance simply fail rather than billing you — there's no
+way to accidentally incur a charge. The trade-off is estimate quality: an open
+8B model's calorie guesses are a real notch below Claude's, closer to "rough
+ballpark" than "look this up carefully." See "Calorie estimation" below for
+the actual prompt.
+
+The Worker is the only thing that ever holds secrets (a GitHub token, your
+ntfy topic, your app password). Nothing secret ever touches `docs/`, because
+anything in `docs/` is public — view-source on the GitHub Pages site shows
+everyone the code, same as job-scraper's dashboard.
 
 ## End-to-end flow
 
 ```mermaid
 flowchart TD
     A["chat.html\n(added to phone home screen)"] -->|"POST /chat\n+ X-App-Secret header"| B["Cloudflare Worker"]
-    B --> C["Anthropic Messages API\nlog_meal tool call:\nitems, calories, tags, reply"]
+    B --> C["Workers AI (env.AI binding)\nfree open model, JSON reply:\nitems, calories, tags, reply"]
     B --> D["GitHub Contents API\nread docs/log.json + docs/settings.json"]
     C --> E["Append meal to today's entry,\nrecompute daily total"]
     D --> E
@@ -104,12 +114,17 @@ the public URL.
 
 ## Calorie estimation
 
-The Worker calls Claude (`claude-haiku-4-5`, cheap and sufficient for this)
-with `tool_choice` forced to a single `log_meal` tool, so the response is
-always structured JSON (item list, calories, tags, a short reply) rather than
-free text that needs fragile parsing. Estimates come from Claude's general
-nutrition knowledge, not a food database — treat them as reasonable
-ballpark figures, not lab-grade precision.
+The Worker calls Workers AI (`@cf/meta/llama-3.1-8b-instruct` by default,
+swap the `AI_MODEL` constant in `worker.js` if it's ever retired) with a
+system prompt instructing it to respond with only a JSON object matching a
+fixed shape (item list, calories, tags, a short reply). Unlike Anthropic's
+forced tool-use, Workers AI's chat models aren't guaranteed to obey a JSON-only
+instruction perfectly — `callWorkersAI()` regex-extracts the first
+`{...}` block from the response and throws a friendly "try rephrasing" error
+if that fails or required fields are missing, rather than silently logging
+garbage. Estimates come from the model's general nutrition knowledge, not a
+food database — treat them as rough ballpark figures, not lab-grade
+precision, more so than a Claude-based version would be.
 
 ## Known limitations (MVP)
 

@@ -15,15 +15,11 @@ for how the pieces fit together.
 3. After the first push (step 6 below), your dashboard will be live at
    `https://apineschi.github.io/meal-tracker/`.
 
-### 2. Create your Anthropic API key
+### 2. (Nothing to do here)
 
-1. Go to [console.anthropic.com](https://console.anthropic.com), sign in,
-   and create an API key under **API Keys**.
-2. Add billing/credit — calorie parsing costs a fraction of a cent per meal
-   logged (a few thousand tokens on a cheap model), so this will be pennies
-   a month for personal use, but the key won't work with $0 credit.
-3. Keep the key value somewhere safe for step 5 — don't paste it into any
-   chat, issue, or commit.
+Calorie parsing runs on Cloudflare Workers AI, which is bound directly into
+the Worker in step 5 — no separate account, key, or billing needed. This is
+what keeps the whole app at $0.
 
 ### 3. Create a GitHub fine-grained token (so the Worker can write to your repo)
 
@@ -53,8 +49,10 @@ for how the pieces fit together.
 2. Click **Edit code** (the in-browser editor). Delete the placeholder
    content and paste in the contents of this project's `worker/worker.js`.
    Click **Deploy**.
-3. Go to the Worker's **Settings** > **Variables and Secrets**. Add:
-   - `ANTHROPIC_API_KEY` — from step 2. Encrypt it.
+3. Go to the Worker's **Settings** > **Bindings** > **Add** > **Workers AI**.
+   Set the variable name to `AI` exactly. Save. This is what runs the
+   calorie parsing, free, with no separate account or key.
+4. Go to the Worker's **Settings** > **Variables and Secrets**. Add:
    - `GITHUB_TOKEN` — from step 3. Encrypt it.
    - `NTFY_TOPIC` — from step 4. Encrypt it.
    - `APP_SECRET` — from step 4. Encrypt it.
@@ -62,14 +60,14 @@ for how the pieces fit together.
    - `GITHUB_REPO` — `meal-tracker`
    - `ALLOWED_ORIGIN` — `https://apineschi.github.io`
    Save/deploy after adding these.
-4. Note your Worker's URL, shown at the top of its page — something like
+5. Note your Worker's URL, shown at the top of its page — something like
    `https://meal-tracker.<your-subdomain>.workers.dev`.
 
 ### 6. Wire the Worker URL into the front end and push
 
 1. In this local folder, open `docs/chat.html` and `docs/index.html`.
 2. In each, find the line `const WORKER_URL = "REPLACE_WITH_YOUR_WORKER_URL";`
-   and replace the placeholder with your actual Worker URL from step 5.4
+   and replace the placeholder with your actual Worker URL from step 5.5
    (keep the quotes).
 3. In **GitHub Desktop**, you'll see all the new files listed as changes.
    Write a commit message (e.g. "Initial setup") and click **Commit to

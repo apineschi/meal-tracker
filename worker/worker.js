@@ -5,17 +5,21 @@
  * "Quick Edit" code editor (Workers & Pages > Create Worker > Edit code). No
  * npm/wrangler install needed.
  *
+ * Required binding (Worker Settings > Bindings > Add > Workers AI):
+ *   AI                 - variable name "AI". This is what makes env.AI.run()
+ *                        work below, at no cost (Cloudflare's free Workers AI
+ *                        daily allowance) and with no separate account/key.
+ *
  * Required secrets (Worker Settings > Variables > "Encrypt" toggle on):
- *   ANTHROPIC_API_KEY  - from console.anthropic.com
  *   GITHUB_TOKEN       - fine-grained PAT, scoped to ONLY the meal-tracker repo,
  *                        Contents: Read and write permission
  *   NTFY_TOPIC         - an unguessable slug, e.g. "apineschi-meals-8f2a1c"
  *   APP_SECRET         - a password only you know. The Worker's URL and this
  *                        file's source are visible to anyone who views the
  *                        GitHub Pages source, so without this check anyone
- *                        who finds the URL could spend your Anthropic credits
- *                        or write junk into your log. The front end sends it
- *                        back in the X-App-Secret header on every request.
+ *                        who finds the URL could write junk into your log.
+ *                        The front end sends it back in the X-App-Secret
+ *                        header on every request.
  *
  * Plain variables (not secret, but fine to also set as encrypted):
  *   GITHUB_OWNER       - e.g. "apineschi"
@@ -23,45 +27,20 @@
  *   ALLOWED_ORIGIN     - e.g. "https://apineschi.github.io"
  */
 
-const ANTHROPIC_MODEL = "claude-haiku-4-5-20251001";
-const ANTHROPIC_VERSION = "2023-06-01";
+// Check the Workers AI models catalog (dashboard > AI > Models) if this ID
+// ever gets retired - swap in another free text-generation/chat model.
+const AI_MODEL = "@cf/meta/llama-3.1-8b-instruct";
 
-const LOG_MEAL_TOOL = {
-  name: "log_meal",
-  description:
-    "Record a parsed meal log entry with per-ingredient calorie estimates.",
-  input_schema: {
-    type: "object",
-    properties: {
-      items: {
-        type: "array",
-        description: "One entry per distinct ingredient/food item mentioned.",
-        items: {
-          type: "object",
-          properties: {
-            name: { type: "string" },
-            quantity: { type: "string", description: "e.g. '2', '1 slice', '100g'" },
-            calories: { type: "number", description: "Estimated calories for this item at the stated quantity." },
-          },
-          required: ["name", "calories"],
-        },
-      },
-      total_calories: { type: "number", description: "Sum of all item calories, rounded to nearest whole number." },
-      tags: {
-        type: "array",
-        items: { type: "string" },
-        description:
-          "Lowercase short tags mentioned or implied by the message, e.g. ['lunch','vegetarian']. Empty array if none.",
-      },
-      reply: {
-        type: "string",
-        description:
-          "A short, friendly one-to-two sentence reply confirming what was logged and the total calories for this meal. Do not mention the daily total here, that is appended separately.",
-      },
-    },
-    required: ["items", "total_calories", "tags", "reply"],
-  },
-};
+const CALORIE_SYSTEM_PROMPT =
+  "You are a calorie-logging assistant. The user will describe a meal in free text, " +
+  "possibly including tags like 'lunch' or 'vegetarian'. Break it into individual food " +
+  "items, estimate reasonable calorie values per item using standard nutritional knowledge, " +
+  "sum the total, and extract any tags (lowercase). If quantities are vague, assume a " +
+  "typical single serving.\n\n" +
+  "Respond with ONLY a single JSON object and no other text, in exactly this shape:\n" +
+  '{"items":[{"name":"...","quantity":"...","calories":123}],"total_calories":123,"tags":["..."],"reply":"..."}\n\n' +
+  "\"reply\" is a short, friendly one-to-two sentence confirmation of what was logged and " +
+  "its total calories - do not mention the daily total there, that is appended separately.";
 
 function corsHeaders(origin) {
   return {
@@ -126,39 +105,32 @@ async function putJsonFile(env, path, data, sha, message) {
   }
 }
 
-async function callClaude(env, message) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": env.ANTHROPIC_API_KEY,
-      "anthropic-version": ANTHROPIC_VERSION,
-    },
-    body: JSON.stringify({
-      model: ANTHROPIC_MODEL,
-      max_tokens: 1024,
-      system:
-        "You are a calorie-logging assistant. The user will describe a meal in free text, " +
-        "possibly including tags like 'lunch' or 'vegetarian'. Break it into individual " +
-        "food items, estimate reasonable calorie values per item using standard nutritional " +
-        "knowledge, sum the total, extract any tags, and call the log_meal tool with the result. " +
-        "If quantities are vague, assume a typical single serving.",
-      messages: [{ role: "user", content: message }],
-      tools: [LOG_MEAL_TOOL],
-      tool_choice: { type: "tool", name: "log_meal" },
-    }),
+async function callWorkersAI(env, message) {
+  const result = await env.AI.run(AI_MODEL, {
+    messages: [
+      { role: "system", content: CALORIE_SYSTEM_PROMPT },
+      { role: "user", content: message },
+    ],
   });
 
-  if (!res.ok) {
-    throw new Error(`Anthropic API failed: ${res.status} ${await res.text()}`);
+  const raw = (result && result.response) || "";
+  const match = raw.match(/\{[\s\S]*\}/);
+  if (!match) {
+    throw new Error("Couldn't parse a reply from the model - try rephrasing your message.");
   }
 
-  const data = await res.json();
-  const toolUse = data.content.find((block) => block.type === "tool_use");
-  if (!toolUse) {
-    throw new Error("Claude did not return a log_meal tool call");
+  let parsed;
+  try {
+    parsed = JSON.parse(match[0]);
+  } catch (err) {
+    throw new Error("Couldn't parse a reply from the model - try rephrasing your message.");
   }
-  return toolUse.input;
+
+  if (!Array.isArray(parsed.items) || typeof parsed.total_calories !== "number") {
+    throw new Error("Model response was missing required fields - try rephrasing your message.");
+  }
+
+  return parsed;
 }
 
 async function postNtfy(env, message, title) {
@@ -196,7 +168,7 @@ async function handleChat(request, env, origin) {
     return jsonResponse({ error: "Missing 'text' field" }, 400, origin);
   }
 
-  const parsed = await callClaude(env, text);
+  const parsed = await callWorkersAI(env, text);
 
   const date = /^\d{4}-\d{2}-\d{2}$/.test(localDate)
     ? localDate
