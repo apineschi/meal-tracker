@@ -86,59 +86,28 @@
         "from_photo": false,
         "items": [
           {
-            "name": "oat milk",
-            "quantity": "150ml",
-            "calories": 68,
-            "unit_label": "100g",
-            "unit_calories": 68,
-            "estimated_gram_weight": 150,
-            "explicit_calories": false,
-            "usda_source": true,
-            "usda_food": "Oat milk",
-            "usda_kcal_per_100g": 45,
-            "usda_url": "https://fdc.nal.usda.gov/food-details/2705412/nutrients",
-            "model_estimate": {
-              "calories": 55,
-              "unit_calories": 55,
-              "unit_label": "150ml"
-            }
+            "name": "150ml oat milk",
+            "quantity": "",
+            "calories": 100,
+            "unit_label": "100ml",
+            "unit_calories": 24
           },
           {
             "name": "tea",
-            "quantity": "150ml",
+            "quantity": "",
             "calories": 3,
             "unit_label": "100g",
-            "unit_calories": 3,
-            "estimated_gram_weight": 150,
-            "explicit_calories": false,
-            "usda_source": true,
-            "usda_food": "Beverages, tea, Oolong, brewed",
-            "usda_kcal_per_100g": 2,
-            "usda_url": "https://fdc.nal.usda.gov/food-details/174120/nutrients",
-            "usda_alternatives": [
-              {
-                "description": "Beverages, tea, green, brewed, regular",
-                "kcal_per_100g": 1,
-                "url": "https://fdc.nal.usda.gov/food-details/171917/nutrients",
-                "calories": 2,
-                "unit_calories": 2
-              }
-            ],
-            "model_estimate": {
-              "calories": 0,
-              "unit_calories": 0,
-              "unit_label": "cup"
-            }
+            "unit_calories": 3
           }
         ],
         "tags": [
           "drink",
           "vegetarian"
         ],
-        "total_calories": 71
+        "total_calories": 103
       }
     ],
-    "total_calories": 1070
+    "total_calories": 1102
   },
   "2026-08-13": {
     "meals": [
