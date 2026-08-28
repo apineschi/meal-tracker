@@ -45,6 +45,13 @@ const CALORIE_SYSTEM_PROMPT =
   "while the empanada is a full, separate item estimated normally at its usual size. If a " +
   "fraction is given without a base weight (e.g. 'half of my sandwich'), first estimate the " +
   "full item's typical calories, then apply the stated fraction to that one item only.\n\n" +
+  "For each item, also report a natural single-unit reference: 'unit_label' is a short " +
+  "description of ONE standard unit WITHOUT a leading number or article (e.g. 'egg', " +
+  "'tbsp (14g)', '100g'), and 'unit_calories' is the calories for that one unit. Pick " +
+  "whatever unit is natural for the food (a whole item like 'egg' or 'banana', or a common " +
+  "serving size like a tablespoon or 100g for things measured in bulk). If the logged " +
+  "quantity already IS one natural unit (e.g. 'a banana'), unit_calories should just equal " +
+  "calories and unit_label should describe that single item.\n\n" +
   "'reply' should be a short, friendly one-to-two sentence confirmation of what was logged " +
   "and its total calories - do not mention the daily total there, that is appended separately.";
 
@@ -63,9 +70,12 @@ const PHOTO_SYSTEM_PROMPT =
   "If you can't find a matching dish or clear serving info, say so honestly in 'reply' and " +
   "still make a best-effort single-item estimate rather than failing.\n\n" +
   "Break the result into individual items (usually just one dish, or its listed components " +
-  "if useful), extract any tags, and respond via the required JSON shape. 'reply' should be " +
-  "a short, friendly one-to-two sentence confirmation - do not mention the daily total, that " +
-  "is appended separately.";
+  "if useful), extract any tags, and respond via the required JSON shape. For each item, " +
+  "also report 'unit_label' (a short description of one natural unit, no leading number or " +
+  "article, e.g. 'taco', '100g') and 'unit_calories' (that unit's calories) - if the item is " +
+  "already a single natural unit, unit_calories should just equal calories. 'reply' should " +
+  "be a short, friendly one-to-two sentence confirmation - do not mention the daily total, " +
+  "that is appended separately.";
 
 // Enforced via response_format below (Workers AI "JSON Mode") rather than
 // hoping the model follows a text instruction - much more reliable, though

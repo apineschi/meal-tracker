@@ -577,7 +577,15 @@
 
   function renderMealView(m, i) {
     const time = new Date(m.time).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-    const itemsText = m.items.map((it) => `${it.name} (${it.calories} kcal)`).join(", ");
+    const itemsText = m.items
+      .map((it) => {
+        const perUnit =
+          it.unit_label && it.unit_calories != null && it.unit_calories !== it.calories
+            ? `, ${it.unit_calories} kcal/${it.unit_label}`
+            : "";
+        return `${it.name} (${it.calories} kcal${perUnit})`;
+      })
+      .join(", ");
     const tagsText = m.tags.length ? ` &middot; ${m.tags.join(", ")}` : "";
     return `<div class="meal">
       <div class="meal-head">

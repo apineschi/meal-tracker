@@ -474,7 +474,11 @@
       if (Array.isArray(data.items) && data.items.length) {
         const lines = data.items.map((i) => {
           const qty = i.quantity ? ` (${i.quantity})` : "";
-          return `${i.name}${qty} — ${i.calories} kcal`;
+          const perUnit =
+            i.unit_label && i.unit_calories != null && i.unit_calories !== i.calories
+              ? ` [${i.unit_calories} kcal per ${i.unit_label}]`
+              : "";
+          return `${i.name}${qty} — ${i.calories} kcal${perUnit}`;
         });
         lines.push(`Total: ${data.meal_total} kcal`);
         if (Array.isArray(data.tags) && data.tags.length) {
