@@ -74,7 +74,10 @@
             "unit_calories": 74
           }
         ],
-        "tags": [],
+        "tags": [
+          "dinner",
+          "meat"
+        ],
         "total_calories": 594
       }
     ],
