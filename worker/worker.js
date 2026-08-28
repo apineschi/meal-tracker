@@ -112,9 +112,18 @@ async function callWorkersAI(env, message) {
       { role: "system", content: CALORIE_SYSTEM_PROMPT },
       { role: "user", content: message },
     ],
+    stream: false,
   });
 
-  const raw = (result && result.response) || "";
+  let raw = "";
+  if (typeof result === "string") {
+    raw = result;
+  } else if (result && typeof result.response === "string") {
+    raw = result.response;
+  } else {
+    raw = JSON.stringify(result || "");
+  }
+
   const match = raw.match(/\{[\s\S]*\}/);
   if (!match) {
     throw new Error("Couldn't parse a reply from the model - try rephrasing your message.");
