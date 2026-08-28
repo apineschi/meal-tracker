@@ -141,31 +141,7 @@
     "total_calories": 516
   },
   "2026-08-18": {
-    "meals": [
-      {
-        "time": "2026-08-28T14:27:07.465Z",
-        "raw_input": "Tea with 150ml oat milk",
-        "from_photo": false,
-        "items": [
-          {
-            "calories": 55,
-            "name": "oat milk",
-            "unit_calories": 55,
-            "unit_label": "150ml"
-          },
-          {
-            "calories": 0,
-            "name": "tea",
-            "unit_calories": 0,
-            "unit_label": "cup"
-          }
-        ],
-        "tags": [
-          "drink"
-        ],
-        "total_calories": 55
-      }
-    ],
-    "total_calories": 55
+    "meals": [],
+    "total_calories": 0
   }
 }
