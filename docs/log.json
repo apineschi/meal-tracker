@@ -68,38 +68,6 @@
         "total_calories": 545
       },
       {
-        "time": "2026-08-28T14:50:30.108Z",
-        "raw_input": "Large ear of corn, 5 medium potatoes, 200g salmon",
-        "from_photo": false,
-        "items": [
-          {
-            "name": "ear of corn",
-            "quantity": "",
-            "calories": 356,
-            "unit_label": "large ear of corn",
-            "unit_calories": 356
-          },
-          {
-            "name": "potatoes",
-            "quantity": "",
-            "calories": 665,
-            "unit_label": "medium potato",
-            "unit_calories": 133
-          },
-          {
-            "name": "salmon",
-            "quantity": "",
-            "calories": 1804,
-            "unit_label": "100g",
-            "unit_calories": 902
-          }
-        ],
-        "tags": [
-          "dinner"
-        ],
-        "total_calories": 2825
-      },
-      {
         "time": "2026-08-28T15:08:40.747Z",
         "raw_input": "3/4 cup of milk, one egg, pork chop",
         "from_photo": false,
@@ -210,7 +178,7 @@
         "total_calories": 671
       }
     ],
-    "total_calories": 5508
+    "total_calories": 2683
   },
   "2026-08-13": {
     "meals": [
