@@ -32,12 +32,43 @@
           }
         ],
         "tags": [
-          "lunch"
+          "lunch",
+          "vegetarian"
         ],
         "total_calories": 437
+      },
+      {
+        "time": "2026-08-28T14:16:08.512Z",
+        "raw_input": "3/4 a head of brocoli, 1 medium chicken thigh with skin, 5 eggs",
+        "from_photo": false,
+        "items": [
+          {
+            "calories": 55,
+            "name": "broccoli",
+            "unit_calories": 55,
+            "unit_label": "100g"
+          },
+          {
+            "calories": 140,
+            "name": "chicken thigh",
+            "unit_calories": 140,
+            "unit_label": "medium chicken thigh with skin"
+          },
+          {
+            "calories": 350,
+            "name": "eggs",
+            "unit_calories": 70,
+            "unit_label": "egg"
+          }
+        ],
+        "tags": [
+          "meat",
+          "dinner"
+        ],
+        "total_calories": 545
       }
     ],
-    "total_calories": 437
+    "total_calories": 982
   },
   "2026-08-13": {
     "meals": [
@@ -47,24 +78,91 @@
         "from_photo": false,
         "items": [
           {
-            "calories": 36,
-            "name": "half a stick of butter"
+            "name": "half a stick of butter",
+            "quantity": "",
+            "calories": 36
           },
           {
-            "calories": 378,
-            "name": "6 eggs"
+            "name": "6 eggs",
+            "quantity": "5",
+            "calories": 360
           },
           {
-            "calories": 120,
-            "name": "a chocolate chip cookie from caffe nero"
+            "name": "a chocolate chip cookie from caffe nero",
+            "quantity": "",
+            "calories": 120
           }
         ],
         "tags": [
           "snack"
         ],
-        "total_calories": 534
+        "total_calories": 516
       }
     ],
-    "total_calories": 534
+    "total_calories": 516
+  },
+  "2026-08-18": {
+    "meals": [
+      {
+        "time": "2026-08-28T14:25:39.234Z",
+        "raw_input": "2 sweet potatoes at 200g each, handful of cauliflower, 1/2 block of tofu",
+        "from_photo": false,
+        "items": [
+          {
+            "calories": 140,
+            "name": "sweet potato",
+            "unit_calories": 110,
+            "unit_label": "100g"
+          },
+          {
+            "calories": 140,
+            "name": "sweet potato",
+            "unit_calories": 110,
+            "unit_label": "100g"
+          },
+          {
+            "calories": 25,
+            "name": "cauliflower",
+            "unit_calories": 25,
+            "unit_label": "handful"
+          },
+          {
+            "calories": 100,
+            "name": "tofu",
+            "unit_calories": 200,
+            "unit_label": "block"
+          }
+        ],
+        "tags": [
+          "vegetarian",
+          "snack"
+        ],
+        "total_calories": 405
+      },
+      {
+        "time": "2026-08-28T14:27:07.465Z",
+        "raw_input": "Tea with 150ml oat milk",
+        "from_photo": false,
+        "items": [
+          {
+            "calories": 55,
+            "name": "oat milk",
+            "unit_calories": 55,
+            "unit_label": "150ml"
+          },
+          {
+            "calories": 0,
+            "name": "tea",
+            "unit_calories": 0,
+            "unit_label": "cup"
+          }
+        ],
+        "tags": [
+          "drink"
+        ],
+        "total_calories": 55
+      }
+    ],
+    "total_calories": 460
   }
 }
