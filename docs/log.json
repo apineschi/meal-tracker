@@ -13,7 +13,7 @@
           {
             "name": "light mozzarella cheese",
             "quantity": "120g",
-            "calories": 0
+            "calories": 200
           },
           {
             "name": "artisan bread",
@@ -34,9 +34,9 @@
         "tags": [
           "lunch"
         ],
-        "total_calories": 237
+        "total_calories": 437
       }
     ],
-    "total_calories": 237
+    "total_calories": 437
   }
 }
