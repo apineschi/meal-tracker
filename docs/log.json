@@ -358,9 +358,54 @@
         ],
         "tags": [],
         "total_calories": 370
+      },
+      {
+        "time": "2026-08-28T15:58:30.225Z",
+        "raw_input": "One hamburger bun, one beef patty, one tomato",
+        "from_photo": false,
+        "items": [
+          {
+            "name": "hamburger bun",
+            "quantity": ">1",
+            "calories": 132,
+            "unit_label": "hamburger bun",
+            "unit_calories": 132,
+            "estimated_gram_weight": 50,
+            "usda_source": true,
+            "usda_food": "McDONALD'S, Hamburger",
+            "usda_kcal_per_100g": 264,
+            "usda_url": "https://fdc.nal.usda.gov/food-details/170717/nutrients"
+          },
+          {
+            "name": "beef patty",
+            "quantity": ">1",
+            "calories": 295,
+            "unit_label": "beef patty",
+            "unit_calories": 295,
+            "estimated_gram_weight": 100,
+            "usda_source": true,
+            "usda_food": "Beef, ground, patties, frozen, cooked, broiled",
+            "usda_kcal_per_100g": 295,
+            "usda_url": "https://fdc.nal.usda.gov/food-details/169447/nutrients"
+          },
+          {
+            "name": "tomato",
+            "quantity": ">1",
+            "calories": 201,
+            "unit_label": "tomato",
+            "unit_calories": 201,
+            "estimated_gram_weight": 150,
+            "usda_source": true,
+            "usda_food": "Tomato products, canned, sauce, with tomato tidbits",
+            "usda_kcal_per_100g": 134,
+            "usda_url": "https://fdc.nal.usda.gov/food-details/170463/nutrients"
+          }
+        ],
+        "tags": [],
+        "total_calories": 628
       }
     ],
-    "total_calories": 6935
+    "total_calories": 7563
   },
   "2026-08-13": {
     "meals": [
