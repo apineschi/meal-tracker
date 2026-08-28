@@ -141,6 +141,48 @@
 
   .legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 8px; }
   .legend span { display: flex; align-items: center; gap: 4px; }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 10;
+  }
+  .modal-overlay.hidden { display: none; }
+  .modal {
+    background: white;
+    border-radius: 14px;
+    padding: 18px;
+    width: 100%;
+    max-width: 320px;
+  }
+  .modal h2 { font-size: 16px; margin: 0 0 10px; }
+  .modal input[type="password"],
+  .modal input[type="text"] {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 15px;
+    box-sizing: border-box;
+  }
+  .modal label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #555;
+    margin-top: 8px;
+  }
+  .modal button {
+    margin-top: 12px;
+    width: 100%;
+    padding: 10px;
+  }
 </style>
 </head>
 <body>
@@ -187,18 +229,56 @@
 
 </main>
 
+<div class="modal-overlay hidden" id="password-overlay">
+  <div class="modal">
+    <h2>Enter your app password</h2>
+    <form id="password-form">
+      <input
+        type="password"
+        id="password-input"
+        autocapitalize="off"
+        autocorrect="off"
+        spellcheck="false"
+        autocomplete="off"
+        required
+      />
+      <label><input type="checkbox" id="password-show" /> Show password</label>
+      <button type="submit">Continue</button>
+    </form>
+  </div>
+</div>
+
 <script>
   // Fill in the URL of your deployed Cloudflare Worker, e.g.
   // "https://meal-tracker.yourname.workers.dev"
   const WORKER_URL = "https://meal-tracker.anastasia-pineschi.workers.dev".replace(/\/+$/, "");
 
-  function getAppSecret() {
-    let secret = localStorage.getItem("meal-tracker-secret");
-    if (!secret) {
-      secret = prompt("Enter your app password (set as APP_SECRET on the Worker):") || "";
-      localStorage.setItem("meal-tracker-secret", secret);
-    }
-    return secret;
+  const passwordOverlay = document.getElementById("password-overlay");
+  const passwordForm = document.getElementById("password-form");
+  const passwordInput = document.getElementById("password-input");
+  const passwordShow = document.getElementById("password-show");
+
+  passwordShow.addEventListener("change", () => {
+    passwordInput.type = passwordShow.checked ? "text" : "password";
+  });
+
+  function ensureAppSecret() {
+    const cached = localStorage.getItem("meal-tracker-secret");
+    if (cached) return Promise.resolve(cached);
+
+    return new Promise((resolve) => {
+      passwordOverlay.classList.remove("hidden");
+      passwordInput.value = "";
+      passwordInput.focus();
+
+      passwordForm.onsubmit = (e) => {
+        e.preventDefault();
+        const value = passwordInput.value;
+        localStorage.setItem("meal-tracker-secret", value);
+        passwordOverlay.classList.add("hidden");
+        resolve(value);
+      };
+    });
   }
 
   let log = {};
@@ -340,9 +420,10 @@
     }
     statusEl.textContent = "Saving…";
     try {
+      const secret = await ensureAppSecret();
       const res = await fetch(WORKER_URL + "/settings", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-App-Secret": getAppSecret() },
+        headers: { "Content-Type": "application/json", "X-App-Secret": secret },
         body: JSON.stringify({ daily_limit: val }),
       });
       if (res.status === 401) {
