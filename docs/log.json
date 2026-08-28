@@ -183,44 +183,32 @@
         "from_photo": false,
         "items": [
           {
-            "name": "light mozzarella",
+            "name": "125 g light mozzarella",
             "quantity": "",
-            "calories": 153,
+            "calories": 125,
             "unit_label": "100g",
-            "unit_calories": 123,
-            "usda_source": true,
-            "usda_food": "Alcoholic beverage, beer, light, BUD LIGHT",
-            "usda_kcal_per_100g": 123,
-            "usda_url": "https://fdc.nal.usda.gov/food-details/169572/nutrients"
+            "unit_calories": 74
           },
           {
             "name": "medium tomatoes",
             "quantity": "",
             "calories": 1047,
             "unit_label": "100g",
-            "unit_calories": 349,
-            "usda_source": true,
-            "usda_food": "Rye flour, medium",
-            "usda_kcal_per_100g": 349,
-            "usda_url": "https://fdc.nal.usda.gov/food-details/168886/nutrients"
+            "unit_calories": 349
           },
           {
             "name": "bread",
             "quantity": "",
             "calories": 816,
             "unit_label": "slice",
-            "unit_calories": 204,
-            "usda_source": true,
-            "usda_food": "Bread, cheese",
-            "usda_kcal_per_100g": 408,
-            "usda_url": "https://fdc.nal.usda.gov/food-details/167944/nutrients"
+            "unit_calories": 204
           }
         ],
         "tags": [
           "snack",
           "vegetarian"
         ],
-        "total_calories": 2016
+        "total_calories": 1988
       },
       {
         "time": "2026-08-28T15:32:39.158Z",
@@ -329,9 +317,29 @@
         ],
         "tags": [],
         "total_calories": 576
+      },
+      {
+        "time": "2026-08-28T15:45:11.016Z",
+        "raw_input": "5 eggs",
+        "from_photo": false,
+        "items": [
+          {
+            "name": "eggs",
+            "quantity": "5",
+            "calories": 740,
+            "unit_label": "100g",
+            "unit_calories": 148,
+            "usda_source": true,
+            "usda_food": "Eggs, Grade A, Large, egg whole",
+            "usda_kcal_per_100g": 148,
+            "usda_url": "https://fdc.nal.usda.gov/food-details/748967/nutrients"
+          }
+        ],
+        "tags": [],
+        "total_calories": 740
       }
     ],
-    "total_calories": 5853
+    "total_calories": 6565
   },
   "2026-08-13": {
     "meals": [
