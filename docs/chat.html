@@ -130,7 +130,7 @@
 <script>
   // Fill in the URL of your deployed Cloudflare Worker, e.g.
   // "https://meal-tracker.yourname.workers.dev"
-  const WORKER_URL = "https://meal-tracker.anastasia-pineschi.workers.dev/";
+  const WORKER_URL = "https://meal-tracker.anastasia-pineschi.workers.dev".replace(/\/+$/, "");
 
   function getAppSecret() {
     let secret = localStorage.getItem("meal-tracker-secret");
