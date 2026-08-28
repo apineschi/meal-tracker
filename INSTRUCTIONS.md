@@ -94,13 +94,26 @@ calendar at `https://apineschi.github.io/meal-tracker/` will show it.
 
 ### Log a meal
 
-Open the home-screen chat icon, type something like:
+Open the home-screen chat icon, tap a meal-type button (Breakfast/Lunch/
+Dinner/Snack/Drink) if you want one, type something like:
 
-> 2 eggs, 1 slice of toast with butter, small orange juice — tags: breakfast
+> 2 eggs, 1 slice of toast with butter, small orange juice
 
-Tags are just words you include naturally (after "tags:" or anywhere in the
-message) — Claude picks up on words like meal names ("lunch", "dinner") or
-diet descriptors ("vegetarian") on its own too.
+and add any other tags (e.g. "vegetarian") in the separate tags box. Portions
+and fractions work per-item — "1/3 of 200g blueberries, one empanada" applies
+the 1/3 only to the blueberries, not the empanada.
+
+### Log a meal from a photo
+
+Tap the 📷 button next to the message box to attach a photo of a **nutrition
+label** or a **restaurant menu**, then hit Send (a caption is optional but
+helps — e.g. name the dish if the menu has several). Label photos are read
+directly (reliable, it's just reading printed numbers). Menu photos: if the
+menu lists a calorie count next to the dish, that's used directly; if it only
+shows an ingredient list, calories are estimated the same way as typed text.
+This isn't meant for photos of an actual plated meal — there's no reliable
+way to judge real portion size or hidden ingredients (oil, sauce) from a
+picture of food itself, so that case isn't supported.
 
 ### Change your daily calorie limit
 
@@ -109,13 +122,16 @@ and click **Save**. It'll ask for your app password the first time.
 
 ### Fix a mis-logged meal
 
-There's no edit UI yet (see ARCHITECTURE.md's known limitations). To fix one:
+On the calendar dashboard, click the day, then **Edit** on the meal. Items
+are listed one per line as `name | quantity | calories` — edit the numbers
+directly and the total recalculates automatically; **Delete** removes the
+whole entry. Both ask for your app password the first time.
 
-1. On GitHub, open `docs/log.json` and click the pencil (edit) icon.
-2. Find the date, edit the meal entry directly (or delete it from the
-   `meals` array), and update that day's `total_calories` to match.
-3. Commit directly to `main` (or ask Claude to make the edit for you if
-   that's easier).
+### Add a forgotten meal to a past day
+
+Click the day on the calendar, then use the **"Add a meal to this day"** box
+at the bottom of the day view — it works exactly like the chat page, just
+logged against that date instead of today.
 
 ### Turn off push notifications
 

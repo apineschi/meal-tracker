@@ -96,7 +96,53 @@
     background: white;
     border-top: 1px solid var(--border);
   }
+  .meal-type-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .meal-type-row button {
+    flex: 1;
+    min-width: 60px;
+    background: white;
+    color: var(--bubble-user);
+    border: 1px solid var(--bubble-user);
+    border-radius: 999px;
+    padding: 6px 4px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .meal-type-row button.selected {
+    background: var(--bubble-user);
+    color: white;
+  }
   .input-row { display: flex; gap: 8px; }
+  #photo-btn {
+    background: white;
+    color: var(--bubble-user);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0 12px;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .photo-preview {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .photo-preview.hidden { display: none; }
+  .photo-preview img {
+    width: 56px;
+    height: 56px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .photo-preview button {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: var(--accent-over);
+  }
   #tags-input {
     border: 1px solid var(--border);
     border-radius: 12px;
@@ -176,11 +222,24 @@
 <div id="status">Loading today's total&hellip;</div>
 <div id="messages"></div>
 <form id="chat-form">
-  <input type="text" id="tags-input" placeholder="Tags (comma separated), e.g. breakfast, vegetarian" />
-  <div class="input-row">
-    <textarea id="input" rows="1" placeholder="e.g. 2 eggs, toast with butter" required></textarea>
-    <button type="submit">Send</button>
+  <div class="meal-type-row" id="meal-type-row">
+    <button type="button" data-type="breakfast">Breakfast</button>
+    <button type="button" data-type="lunch">Lunch</button>
+    <button type="button" data-type="dinner">Dinner</button>
+    <button type="button" data-type="snack">Snack</button>
+    <button type="button" data-type="drink">Drink</button>
   </div>
+  <input type="text" id="tags-input" placeholder="Other tags (comma separated), e.g. vegetarian" />
+  <div id="photo-preview" class="photo-preview hidden">
+    <img id="photo-preview-img" alt="Selected photo" />
+    <button type="button" id="photo-remove">Remove photo</button>
+  </div>
+  <div class="input-row">
+    <button type="button" id="photo-btn" title="Add a photo of a nutrition label or menu">📷</button>
+    <textarea id="input" rows="1" placeholder="e.g. 2 eggs, toast with butter (or add a photo)"></textarea>
+    <button type="submit" id="send-btn">Send</button>
+  </div>
+  <input type="file" id="photo-file" accept="image/*" style="display:none" />
 </form>
 
 <div class="modal-overlay hidden" id="password-overlay">
@@ -279,25 +338,98 @@
   }
 
   const tagsInput = document.getElementById("tags-input");
+  const mealTypeRow = document.getElementById("meal-type-row");
+  let selectedMealType = null;
+
+  mealTypeRow.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-type]");
+    if (!btn) return;
+    const isSame = btn.dataset.type === selectedMealType;
+    mealTypeRow.querySelectorAll("button").forEach((b) => b.classList.remove("selected"));
+    selectedMealType = isSame ? null : btn.dataset.type;
+    if (selectedMealType) btn.classList.add("selected");
+  });
+
+  const photoBtn = document.getElementById("photo-btn");
+  const photoFile = document.getElementById("photo-file");
+  const photoPreview = document.getElementById("photo-preview");
+  const photoPreviewImg = document.getElementById("photo-preview-img");
+  const photoRemove = document.getElementById("photo-remove");
+  let selectedPhoto = null;
+
+  function resizeImage(file, maxDim, quality) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > height && width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        };
+        img.onerror = reject;
+        img.src = reader.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  photoBtn.addEventListener("click", () => photoFile.click());
+
+  photoFile.addEventListener("change", async () => {
+    const file = photoFile.files[0];
+    if (!file) return;
+    try {
+      selectedPhoto = await resizeImage(file, 1024, 0.7);
+      photoPreviewImg.src = selectedPhoto;
+      photoPreview.classList.remove("hidden");
+    } catch (err) {
+      alert("Couldn't read that photo, please try again.");
+    }
+  });
+
+  photoRemove.addEventListener("click", () => {
+    selectedPhoto = null;
+    photoFile.value = "";
+    photoPreview.classList.add("hidden");
+  });
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const text = input.value.trim();
-    const tags = tagsInput.value.trim();
-    if (!text) return;
+    const tags = [tagsInput.value.trim(), selectedMealType].filter(Boolean).join(", ");
+    if (!text && !selectedPhoto) return;
 
-    addBubble(tags ? `${text}\n[tags: ${tags}]` : text, "user");
+    const photoToSend = selectedPhoto;
+    const bubbleText = photoToSend ? (text ? `📷 ${text}` : "📷 (photo)") : text;
+    addBubble(tags ? `${bubbleText}\n[tags: ${tags}]` : bubbleText, "user");
     input.value = "";
     tagsInput.value = "";
+    mealTypeRow.querySelectorAll("button").forEach((b) => b.classList.remove("selected"));
+    selectedMealType = null;
+    selectedPhoto = null;
+    photoFile.value = "";
+    photoPreview.classList.add("hidden");
     input.disabled = true;
-    form.querySelector("button").disabled = true;
+    document.getElementById("send-btn").disabled = true;
 
     try {
       const secret = await ensureAppSecret();
       const res = await fetch(WORKER_URL + "/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-App-Secret": secret },
-        body: JSON.stringify({ text, tags, localDate: localDateString() }),
+        body: JSON.stringify({ text, image: photoToSend, tags, localDate: localDateString() }),
       });
       if (res.status === 401) {
         localStorage.removeItem("meal-tracker-secret");
@@ -326,7 +458,7 @@
       addBubble("Error: " + err.message, "error");
     } finally {
       input.disabled = false;
-      form.querySelector("button").disabled = false;
+      document.getElementById("send-btn").disabled = false;
       input.focus();
     }
   });

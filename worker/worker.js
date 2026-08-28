@@ -28,18 +28,44 @@
  */
 
 // Check the Workers AI models catalog (dashboard > AI > Models, or
-// developers.cloudflare.com/workers-ai/models/) if this ID ever gets
-// retired - swap in another free text-generation/chat model.
+// developers.cloudflare.com/workers-ai/models/) if either ID ever gets
+// retired - swap in another free text-generation/chat or vision model.
 const AI_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+const VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct";
 
 const CALORIE_SYSTEM_PROMPT =
   "You are a calorie-logging assistant. The user will describe a meal in free text, " +
   "possibly including tags like 'lunch' or 'vegetarian'. Break it into individual food " +
   "items, estimate reasonable calorie values per item using standard nutritional knowledge, " +
   "sum the total, and extract any tags (lowercase). If quantities are vague, assume a " +
-  "typical single serving. 'reply' should be a short, friendly one-to-two sentence " +
-  "confirmation of what was logged and its total calories - do not mention the daily " +
-  "total there, that is appended separately.";
+  "typical single serving.\n\n" +
+  "Fractions and portions apply ONLY to the specific item they're stated next to, never to " +
+  "the whole message. '1/3 of 200g blueberries, one empanada' means: blueberries effective " +
+  "quantity is about 67g (1/3 of 200g) - estimate calories for that reduced amount only - " +
+  "while the empanada is a full, separate item estimated normally at its usual size. If a " +
+  "fraction is given without a base weight (e.g. 'half of my sandwich'), first estimate the " +
+  "full item's typical calories, then apply the stated fraction to that one item only.\n\n" +
+  "'reply' should be a short, friendly one-to-two sentence confirmation of what was logged " +
+  "and its total calories - do not mention the daily total there, that is appended separately.";
+
+const PHOTO_SYSTEM_PROMPT =
+  "You are a calorie-logging assistant reading a photo of either a nutrition facts label or " +
+  "a restaurant menu. The user may include a caption naming the dish they had or giving other " +
+  "context - use it if present.\n\n" +
+  "If the photo is a nutrition label: read the calories per serving and the number of " +
+  "servings shown, and use the caption (if any) to figure out how many servings the user " +
+  "actually had, defaulting to 1 serving if that's unclear.\n\n" +
+  "If the photo is a menu: find the specific dish the caption names. If there's no caption " +
+  "and the photo is clearly focused on one dish, use that one. If the menu lists a calorie " +
+  "count next to the dish, use it directly rather than estimating. If only an ingredient " +
+  "list or description is shown, estimate calories from those ingredients the same way you " +
+  "would from a typed description.\n\n" +
+  "If you can't find a matching dish or clear serving info, say so honestly in 'reply' and " +
+  "still make a best-effort single-item estimate rather than failing.\n\n" +
+  "Break the result into individual items (usually just one dish, or its listed components " +
+  "if useful), extract any tags, and respond via the required JSON shape. 'reply' should be " +
+  "a short, friendly one-to-two sentence confirmation - do not mention the daily total, that " +
+  "is appended separately.";
 
 // Enforced via response_format below (Workers AI "JSON Mode") rather than
 // hoping the model follows a text instruction - much more reliable, though
@@ -129,6 +155,30 @@ async function putJsonFile(env, path, data, sha, message) {
   }
 }
 
+function extractMealJson(result, errorHint) {
+  // In JSON Mode, result.response is normally the already-parsed object, but
+  // fall back to parsing it as a JSON string in case a model/version returns
+  // it that way instead.
+  let parsed = result && result.response;
+  if (typeof parsed === "string") {
+    const match = parsed.match(/\{[\s\S]*\}/);
+    if (!match) {
+      throw new Error(`Couldn't parse a reply from the model - ${errorHint}`);
+    }
+    try {
+      parsed = JSON.parse(match[0]);
+    } catch (err) {
+      throw new Error(`Couldn't parse a reply from the model - ${errorHint}`);
+    }
+  }
+
+  if (!parsed || !Array.isArray(parsed.items) || typeof parsed.total_calories !== "number") {
+    throw new Error(`Model response was missing required fields - ${errorHint}`);
+  }
+
+  return parsed;
+}
+
 async function callWorkersAI(env, message) {
   const result = await env.AI.run(AI_MODEL, {
     messages: [
@@ -138,27 +188,25 @@ async function callWorkersAI(env, message) {
     response_format: { type: "json_schema", json_schema: MEAL_JSON_SCHEMA },
   });
 
-  // In JSON Mode, result.response is normally the already-parsed object, but
-  // fall back to parsing it as a JSON string in case a model/version returns
-  // it that way instead.
-  let parsed = result && result.response;
-  if (typeof parsed === "string") {
-    const match = parsed.match(/\{[\s\S]*\}/);
-    if (!match) {
-      throw new Error("Couldn't parse a reply from the model - try rephrasing your message.");
-    }
-    try {
-      parsed = JSON.parse(match[0]);
-    } catch (err) {
-      throw new Error("Couldn't parse a reply from the model - try rephrasing your message.");
-    }
-  }
+  return extractMealJson(result, "try rephrasing your message.");
+}
 
-  if (!parsed || !Array.isArray(parsed.items) || typeof parsed.total_calories !== "number") {
-    throw new Error("Model response was missing required fields - try rephrasing your message.");
-  }
+async function callWorkersAIVision(env, imageDataUrl, caption) {
+  const result = await env.AI.run(VISION_MODEL, {
+    messages: [
+      { role: "system", content: PHOTO_SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: caption || "What dish or nutrition info is shown here?" },
+          { type: "image_url", image_url: { url: imageDataUrl } },
+        ],
+      },
+    ],
+    response_format: { type: "json_schema", json_schema: MEAL_JSON_SCHEMA },
+  });
 
-  return parsed;
+  return extractMealJson(result, "try a clearer photo, or add a short text caption.");
 }
 
 async function postNtfy(env, message, title) {
@@ -204,12 +252,17 @@ function normalizeTags(value) {
 }
 
 async function handleChat(request, env, origin) {
-  const { text, localDate, tags: manualTags } = await request.json();
-  if (!text || typeof text !== "string") {
-    return jsonResponse({ error: "Missing 'text' field" }, 400, origin);
+  const { text, image, localDate, tags: manualTags } = await request.json();
+  const caption = typeof text === "string" ? text.trim() : "";
+
+  if (!caption && !image) {
+    return jsonResponse({ error: "Missing 'text' or 'image' field" }, 400, origin);
+  }
+  if (image && typeof image !== "string") {
+    return jsonResponse({ error: "'image' must be a data URL string" }, 400, origin);
   }
 
-  const parsed = await callWorkersAI(env, text);
+  const parsed = image ? await callWorkersAIVision(env, image, caption) : await callWorkersAI(env, caption);
 
   const date = /^\d{4}-\d{2}-\d{2}$/.test(localDate)
     ? localDate
@@ -228,7 +281,8 @@ async function handleChat(request, env, origin) {
 
   const meal = {
     time: new Date().toISOString(),
-    raw_input: text,
+    raw_input: caption || (image ? "(photo)" : ""),
+    from_photo: Boolean(image),
     items: parsed.items,
     tags: combinedTags,
     total_calories: Math.round(parsed.total_calories),
