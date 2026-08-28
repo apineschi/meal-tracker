@@ -48,45 +48,6 @@
         "total_calories": 405
       },
       {
-        "time": "2026-08-28T15:17:38.501Z",
-        "raw_input": "1/2 cup milk, beef patty, half a head of lettuce",
-        "from_photo": false,
-        "items": [
-          {
-            "name": "milk",
-            "quantity": "",
-            "calories": 111.5,
-            "unit_label": "100g",
-            "unit_calories": 446,
-            "usda_source": true,
-            "usda_food": "Crackers, milk",
-            "usda_kcal_per_100g": 446
-          },
-          {
-            "name": "beef patty",
-            "quantity": "",
-            "calories": 295,
-            "unit_label": "100g",
-            "unit_calories": 295,
-            "usda_source": true,
-            "usda_food": "Beef, ground, patties, frozen, cooked, broiled",
-            "usda_kcal_per_100g": 295
-          },
-          {
-            "name": "lettuce",
-            "quantity": "",
-            "calories": 35,
-            "unit_label": "100g",
-            "unit_calories": 20,
-            "usda_source": true,
-            "usda_food": "Lettuce, raw",
-            "usda_kcal_per_100g": 20
-          }
-        ],
-        "tags": [],
-        "total_calories": 442
-      },
-      {
         "time": "2026-08-28T15:18:58.238Z",
         "raw_input": "1/2 cup milk, beef patty, hamburger bun",
         "from_photo": false,
@@ -412,7 +373,7 @@
         "total_calories": 320
       }
     ],
-    "total_calories": 7661
+    "total_calories": 7219
   },
   "2026-08-13": {
     "meals": [
