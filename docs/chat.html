@@ -22,8 +22,7 @@
   * { box-sizing: border-box; min-width: 0; }
   html, body {
     margin: 0;
-    min-height: 100%;
-    min-height: 100dvh;
+    height: 100%;
     overflow-x: hidden;
     max-width: 100%;
     background: var(--bg);
@@ -34,9 +33,6 @@
     flex-direction: column;
   }
   header {
-    position: sticky;
-    top: 0;
-    z-index: 5;
     padding: 14px 16px calc(10px + env(safe-area-inset-top, 0px));
     padding-top: calc(14px + env(safe-area-inset-top, 0px));
     background: var(--bubble-user);
@@ -58,7 +54,6 @@
   #status.under { color: var(--accent-under); }
   #messages {
     flex: 1;
-    min-height: 0;
     overflow-y: auto;
     padding: 12px;
     display: flex;
@@ -235,7 +230,12 @@
     <button type="button" data-type="snack">Snack</button>
     <button type="button" data-type="drink">Drink</button>
   </div>
-  <input type="text" id="tags-input" placeholder="Other tags (comma separated), e.g. vegetarian" />
+  <div class="meal-type-row" id="diet-type-row">
+    <button type="button" data-diet="meat">Meat</button>
+    <button type="button" data-diet="vegetarian">Vegetarian</button>
+    <button type="button" data-diet="vegan">Vegan</button>
+  </div>
+  <input type="text" id="tags-input" placeholder="Other tags (comma separated)" />
   <div id="photo-preview" class="photo-preview hidden">
     <img id="photo-preview-img" alt="Selected photo" />
     <button type="button" id="photo-remove">Remove photo</button>
@@ -375,7 +375,9 @@
 
   const tagsInput = document.getElementById("tags-input");
   const mealTypeRow = document.getElementById("meal-type-row");
+  const dietTypeRow = document.getElementById("diet-type-row");
   let selectedMealType = null;
+  let selectedDiet = null;
 
   mealTypeRow.addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-type]");
@@ -384,6 +386,15 @@
     mealTypeRow.querySelectorAll("button").forEach((b) => b.classList.remove("selected"));
     selectedMealType = isSame ? null : btn.dataset.type;
     if (selectedMealType) btn.classList.add("selected");
+  });
+
+  dietTypeRow.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-diet]");
+    if (!btn) return;
+    const isSame = btn.dataset.diet === selectedDiet;
+    dietTypeRow.querySelectorAll("button").forEach((b) => b.classList.remove("selected"));
+    selectedDiet = isSame ? null : btn.dataset.diet;
+    if (selectedDiet) btn.classList.add("selected");
   });
 
   const photoBtn = document.getElementById("photo-btn");
@@ -444,7 +455,7 @@
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const text = input.value.trim();
-    const tags = [tagsInput.value.trim(), selectedMealType].filter(Boolean).join(", ");
+    const tags = [tagsInput.value.trim(), selectedMealType, selectedDiet].filter(Boolean).join(", ");
     if (!text && !selectedPhoto) return;
 
     const photoToSend = selectedPhoto;
@@ -454,7 +465,9 @@
     input.style.height = "auto";
     tagsInput.value = "";
     mealTypeRow.querySelectorAll("button").forEach((b) => b.classList.remove("selected"));
+    dietTypeRow.querySelectorAll("button").forEach((b) => b.classList.remove("selected"));
     selectedMealType = null;
+    selectedDiet = null;
     selectedPhoto = null;
     photoFile.value = "";
     photoPreview.classList.add("hidden");
@@ -481,7 +494,10 @@
           const qty = i.quantity ? ` (${i.quantity})` : "";
           const perUnit =
             i.unit_label && i.unit_calories != null ? ` [${i.unit_calories} kcal per ${i.unit_label}]` : "";
-          return `${i.name}${qty} — ${i.calories} kcal${perUnit}`;
+          const usda = i.usda_source
+            ? ` (USDA: ${i.usda_food}, ${i.usda_kcal_per_100g} kcal/100g)`
+            : "";
+          return `${i.name}${qty} — ${i.calories} kcal${perUnit}${usda}`;
         });
         lines.push(`Total: ${data.meal_total} kcal`);
         if (Array.isArray(data.tags) && data.tags.length) {

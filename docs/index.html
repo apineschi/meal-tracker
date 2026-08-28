@@ -404,6 +404,11 @@
         <button type="button" data-type="snack">Snack</button>
         <button type="button" data-type="drink">Drink</button>
       </div>
+      <div class="meal-type-row" id="add-diet-type-row">
+        <button type="button" data-diet="meat">Meat</button>
+        <button type="button" data-diet="vegetarian">Vegetarian</button>
+        <button type="button" data-diet="vegan">Vegan</button>
+      </div>
       <input type="text" id="add-meal-tags" placeholder="Other tags (comma separated)" />
       <div class="photo-preview hidden" id="add-meal-photo-preview">
         <img id="add-meal-photo-preview-img" alt="Selected photo" />
@@ -606,7 +611,8 @@
       .map((it) => {
         const perUnit =
           it.unit_label && it.unit_calories != null ? `, ${it.unit_calories} kcal/${it.unit_label}` : "";
-        return `${it.name} (${it.calories} kcal${perUnit})`;
+        const usda = it.usda_source ? ` (USDA: ${it.usda_food}, ${it.usda_kcal_per_100g} kcal/100g)` : "";
+        return `${it.name} (${it.calories} kcal${perUnit}${usda})`;
       })
       .join(", ");
     const tagsHtml = m.tags.length
@@ -804,7 +810,9 @@
   });
 
   const addMealTypeRow = document.getElementById("add-meal-type-row");
+  const addDietTypeRow = document.getElementById("add-diet-type-row");
   let addMealSelectedType = null;
+  let addMealSelectedDiet = null;
 
   addMealTypeRow.addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-type]");
@@ -813,6 +821,15 @@
     addMealTypeRow.querySelectorAll("button").forEach((b) => b.classList.remove("selected"));
     addMealSelectedType = isSame ? null : btn.dataset.type;
     if (addMealSelectedType) btn.classList.add("selected");
+  });
+
+  addDietTypeRow.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-diet]");
+    if (!btn) return;
+    const isSame = btn.dataset.diet === addMealSelectedDiet;
+    addDietTypeRow.querySelectorAll("button").forEach((b) => b.classList.remove("selected"));
+    addMealSelectedDiet = isSame ? null : btn.dataset.diet;
+    if (addMealSelectedDiet) btn.classList.add("selected");
   });
 
   const addMealPhotoBtn = document.getElementById("add-meal-photo-btn");
@@ -876,7 +893,7 @@
     const tagsEl = document.getElementById("add-meal-tags");
     const statusEl = document.getElementById("add-meal-status");
     const text = textEl.value.trim();
-    const tags = [tagsEl.value.trim(), addMealSelectedType].filter(Boolean).join(", ");
+    const tags = [tagsEl.value.trim(), addMealSelectedType, addMealSelectedDiet].filter(Boolean).join(", ");
     const photoToSend = addMealSelectedPhoto;
     if (!dateStr || (!text && !photoToSend)) {
       statusEl.textContent = "Enter a description or add a photo first.";
@@ -911,7 +928,9 @@
       textEl.value = "";
       tagsEl.value = "";
       addMealTypeRow.querySelectorAll("button").forEach((b) => b.classList.remove("selected"));
+      addDietTypeRow.querySelectorAll("button").forEach((b) => b.classList.remove("selected"));
       addMealSelectedType = null;
+      addMealSelectedDiet = null;
       addMealSelectedPhoto = null;
       addMealPhotoFile.value = "";
       addMealPhotoPreview.classList.add("hidden");

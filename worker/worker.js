@@ -244,25 +244,45 @@ async function usdaSearch(env, query, dataType) {
 }
 
 async function lookupUsdaFood(env, query) {
-  if (!env.USDA_API_KEY) return null;
+  if (!env.USDA_API_KEY) {
+    console.log("USDA_API_KEY not set - skipping nutrition lookup, using model estimate only");
+    return null;
+  }
   try {
     // Generic/raw foods (Foundation, SR Legacy) first - much better match for
     // typical logged ingredients than packaged "Branded" products. Fall back
     // to the full catalog (including Branded) if nothing generic turns up.
     let food = await usdaSearch(env, query, "Foundation,SR Legacy");
-    if (!food) food = await usdaSearch(env, query, null);
-    if (!food) return null;
+    let kcal = food ? extractKcalPer100g(food) : null;
+    if (kcal == null) {
+      food = await usdaSearch(env, query, null);
+      kcal = food ? extractKcalPer100g(food) : null;
+    }
+    if (kcal == null) return null;
 
-    const energy = (food.foodNutrients || []).find(
-      (n) => n.nutrientName === "Energy" && n.unitName === "KCAL"
-    );
-    if (!energy) return null;
-
-    return { description: food.description, kcalPer100g: energy.value };
+    console.log(`USDA match for "${query}": "${food.description}" = ${kcal} kcal/100g`);
+    return { description: food.description, kcalPer100g: kcal };
   } catch (err) {
     console.error("USDA lookup failed", err);
     return null;
   }
+}
+
+// Real food essentially never exceeds pure fat's ~900 kcal/100g. FDC's search
+// results can list "Energy" more than once per food (kcal and kJ variants,
+// plus Foundation Foods' separate "Atwater General/Specific Factors" energy
+// entries) and the reported unitName isn't reliable enough to trust blindly -
+// a kJ figure mistaken for kcal, or a mismatched high-fat product, both show
+// up as an implausibly large number. Scan every "Energy" entry and take the
+// first one that's actually plausible, rather than the first one found.
+const USDA_MAX_PLAUSIBLE_KCAL_PER_100G = 900;
+
+function extractKcalPer100g(food) {
+  const candidates = (food.foodNutrients || []).filter(
+    (n) => n.nutrientName === "Energy" && typeof n.value === "number" && n.value > 0
+  );
+  const plausible = candidates.find((n) => n.value <= USDA_MAX_PLAUSIBLE_KCAL_PER_100G);
+  return plausible ? plausible.value : null;
 }
 
 async function runCalorieModel(env, systemPrompt, message) {
@@ -280,17 +300,19 @@ async function runCalorieModel(env, systemPrompt, message) {
 async function callWorkersAI(env, message) {
   const firstPass = await runCalorieModel(env, CALORIE_SYSTEM_PROMPT, message);
 
-  const facts = [];
+  const factsByName = new Map();
   for (const item of firstPass.items) {
     const food = await lookupUsdaFood(env, item.name);
-    if (food) {
-      facts.push(`- ${item.name}: USDA "${food.description}" has ${Math.round(food.kcalPer100g)} kcal per 100g.`);
-    }
+    if (food) factsByName.set(item.name.toLowerCase(), food);
   }
 
-  if (!facts.length) {
+  if (!factsByName.size) {
     return firstPass;
   }
+
+  const factLines = [...factsByName.entries()].map(
+    ([name, food]) => `- ${name}: USDA "${food.description}" has ${Math.round(food.kcalPer100g)} kcal per 100g.`
+  );
 
   const groundedPrompt =
     CALORIE_SYSTEM_PROMPT +
@@ -300,16 +322,33 @@ async function callWorkersAI(env, message) {
     "scale '143 kcal per 100g' to the real weight/count logged). For any item with no fact " +
     "provided, keep using your own best estimate. Recompute the total and per-unit figures " +
     "to match.\n\nUSDA facts:\n" +
-    facts.join("\n");
+    factLines.join("\n");
 
+  let final;
   try {
-    return await runCalorieModel(env, groundedPrompt, message);
+    final = await runCalorieModel(env, groundedPrompt, message);
   } catch (err) {
     // Grounding is a pure accuracy improvement - if the second pass fails for
     // any reason, the ungrounded first pass is still a perfectly valid result.
     console.error("Grounded re-pass failed, using first-pass estimate", err);
     return firstPass;
   }
+
+  // Tag whichever items in the final result correspond to a USDA fact we
+  // looked up, so the front end can show the reader what was actually used
+  // ("(USDA)") rather than presenting every number as equally sourced.
+  final.items = final.items.map((it) => {
+    const food = factsByName.get(it.name.toLowerCase());
+    if (!food) return it;
+    return {
+      ...it,
+      usda_source: true,
+      usda_food: food.description,
+      usda_kcal_per_100g: Math.round(food.kcalPer100g),
+    };
+  });
+
+  return final;
 }
 
 async function callWorkersAIVision(env, imageDataUrl, caption) {
