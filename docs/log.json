@@ -53,20 +53,32 @@
         "from_photo": false,
         "items": [
           {
-            "name": "beef empenada",
-            "quantity": "1",
+            "name": "1 beef empenada",
+            "quantity": "",
             "calories": 320,
             "unit_label": "empenada",
-            "unit_calories": 320,
-            "estimated_gram_weight": 120,
-            "explicit_calories": false
+            "unit_calories": 320
+          },
+          {
+            "name": "Mushroom soup",
+            "quantity": "",
+            "calories": 200,
+            "unit_label": "Mushroom soup",
+            "unit_calories": 200
+          },
+          {
+            "name": "Fried egg",
+            "quantity": "",
+            "calories": 74,
+            "unit_label": "egg",
+            "unit_calories": 74
           }
         ],
         "tags": [],
-        "total_calories": 320
+        "total_calories": 594
       }
     ],
-    "total_calories": 725
+    "total_calories": 999
   },
   "2026-08-13": {
     "meals": [
