@@ -27,9 +27,10 @@
  *   ALLOWED_ORIGIN     - e.g. "https://apineschi.github.io"
  */
 
-// Check the Workers AI models catalog (dashboard > AI > Models) if this ID
-// ever gets retired - swap in another free text-generation/chat model.
-const AI_MODEL = "@cf/meta/llama-3.1-8b-instruct";
+// Check the Workers AI models catalog (dashboard > AI > Models, or
+// developers.cloudflare.com/workers-ai/models/) if this ID ever gets
+// retired - swap in another free text-generation/chat model.
+const AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast";
 
 const CALORIE_SYSTEM_PROMPT =
   "You are a calorie-logging assistant. The user will describe a meal in free text, " +
