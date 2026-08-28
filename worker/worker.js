@@ -30,7 +30,7 @@
 // Check the Workers AI models catalog (dashboard > AI > Models, or
 // developers.cloudflare.com/workers-ai/models/) if this ID ever gets
 // retired - swap in another free text-generation/chat model.
-const AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast";
+const AI_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
 const CALORIE_SYSTEM_PROMPT =
   "You are a calorie-logging assistant. The user will describe a meal in free text, " +
@@ -190,8 +190,21 @@ async function handleSettings(request, env, origin) {
   return jsonResponse({ daily_limit: dailyLimit }, 200, origin);
 }
 
+function normalizeTags(value) {
+  if (Array.isArray(value)) {
+    return value.map((t) => String(t).trim().toLowerCase()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((t) => t.trim().toLowerCase())
+      .filter(Boolean);
+  }
+  return [];
+}
+
 async function handleChat(request, env, origin) {
-  const { text, localDate } = await request.json();
+  const { text, localDate, tags: manualTags } = await request.json();
   if (!text || typeof text !== "string") {
     return jsonResponse({ error: "Missing 'text' field" }, 400, origin);
   }
@@ -211,11 +224,13 @@ async function handleChat(request, env, origin) {
     log[date] = { meals: [], total_calories: 0 };
   }
 
+  const combinedTags = [...new Set([...normalizeTags(parsed.tags), ...normalizeTags(manualTags)])];
+
   const meal = {
     time: new Date().toISOString(),
     raw_input: text,
     items: parsed.items,
-    tags: (parsed.tags || []).map((t) => t.toLowerCase()),
+    tags: combinedTags,
     total_calories: Math.round(parsed.total_calories),
   };
 
@@ -245,6 +260,9 @@ async function handleChat(request, env, origin) {
   return jsonResponse(
     {
       reply: parsed.reply,
+      items: meal.items,
+      tags: meal.tags,
+      meal_total: meal.total_calories,
       total_today: dailyTotal,
       limit,
       over_limit: overLimit,
@@ -253,6 +271,64 @@ async function handleChat(request, env, origin) {
     origin
   );
 }
+
+async function handleEditMeal(request, env, origin) {
+  const { date, index, items, tags } = await request.json();
+
+  if (
+    typeof date !== "string" ||
+    typeof index !== "number" ||
+    !Array.isArray(items) ||
+    items.some((i) => typeof i.name !== "string" || typeof i.calories !== "number")
+  ) {
+    return jsonResponse({ error: "Missing or invalid fields" }, 400, origin);
+  }
+
+  const { data: log, sha } = await getJsonFile(env, "docs/log.json", {});
+  if (!log[date] || !log[date].meals[index]) {
+    return jsonResponse({ error: "Meal not found" }, 404, origin);
+  }
+
+  const totalCalories = Math.round(items.reduce((sum, i) => sum + Number(i.calories || 0), 0));
+  log[date].meals[index] = {
+    ...log[date].meals[index],
+    items,
+    tags: normalizeTags(tags),
+    total_calories: totalCalories,
+  };
+  log[date].total_calories = log[date].meals.reduce((sum, m) => sum + m.total_calories, 0);
+
+  await putJsonFile(env, "docs/log.json", log, sha, `Edit meal (${date} #${index})`);
+
+  return jsonResponse({ day_total: log[date].total_calories }, 200, origin);
+}
+
+async function handleDeleteMeal(request, env, origin) {
+  const { date, index } = await request.json();
+
+  if (typeof date !== "string" || typeof index !== "number") {
+    return jsonResponse({ error: "Missing or invalid fields" }, 400, origin);
+  }
+
+  const { data: log, sha } = await getJsonFile(env, "docs/log.json", {});
+  if (!log[date] || !log[date].meals[index]) {
+    return jsonResponse({ error: "Meal not found" }, 404, origin);
+  }
+
+  log[date].meals.splice(index, 1);
+  log[date].total_calories = log[date].meals.reduce((sum, m) => sum + m.total_calories, 0);
+
+  await putJsonFile(env, "docs/log.json", log, sha, `Delete meal (${date} #${index})`);
+
+  return jsonResponse({ day_total: log[date].total_calories }, 200, origin);
+}
+
+const ROUTES = {
+  "/chat": handleChat,
+  "/settings": handleSettings,
+  "/edit-meal": handleEditMeal,
+  "/delete-meal": handleDeleteMeal,
+};
 
 export default {
   async fetch(request, env) {
@@ -263,14 +339,14 @@ export default {
     }
 
     const url = new URL(request.url);
+    const handler = ROUTES[url.pathname];
 
-    if ((url.pathname === "/chat" || url.pathname === "/settings") && request.method === "POST") {
+    if (handler && request.method === "POST") {
       if (!checkSecret(request, env)) {
         return jsonResponse({ error: "Unauthorized" }, 401, origin);
       }
       try {
-        if (url.pathname === "/chat") return await handleChat(request, env, origin);
-        return await handleSettings(request, env, origin);
+        return await handler(request, env, origin);
       } catch (err) {
         console.error(err);
         return jsonResponse({ error: err.message }, 500, origin);

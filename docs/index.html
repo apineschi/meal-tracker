@@ -17,7 +17,8 @@
     --text: #1a1a1a;
     --muted: #6b7570;
   }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; min-width: 0; }
+  html, body { overflow-x: hidden; max-width: 100%; }
   body {
     margin: 0;
     background: var(--bg);
@@ -85,12 +86,21 @@
     cursor: pointer;
     position: relative;
     background: #fafbfa;
+    overflow: hidden;
   }
   .day.empty { border: none; background: none; cursor: default; }
   .day.selected { outline: 2px solid var(--accent); }
   .day .num { font-size: 12px; font-weight: 600; }
   .day .flag { font-size: 14px; line-height: 1; margin-top: 2px; }
-  .day .kcal { font-size: 9px; color: var(--muted); margin-top: 1px; }
+  .day .kcal {
+    font-size: 9px;
+    color: var(--muted);
+    margin-top: 1px;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .day.match { background: #fff7d6; border-color: #e8d27a; }
 
   input[type="text"], input[type="number"] {
@@ -118,6 +128,66 @@
   }
   .meal:first-child { border-top: none; }
   .meal .items { color: var(--muted); margin-top: 2px; }
+  .meal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .meal-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .meal-actions button {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px 8px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .meal-actions button.danger { color: var(--over); border-color: #f3c6c1; }
+
+  .edit-form textarea {
+    width: 100%;
+    min-height: 70px;
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-top: 6px;
+  }
+  .edit-form .hint { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .edit-form .row { display: flex; gap: 8px; margin-top: 8px; }
+  .edit-form .row button {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    border: none;
+    font-size: 13px;
+  }
+  .edit-form .save { background: var(--accent); color: white; }
+  .edit-form .cancel { background: #eee; color: #333; }
+
+  .add-meal {
+    border-top: 1px solid var(--border);
+    margin-top: 10px;
+    padding-top: 10px;
+  }
+  .add-meal input[type="text"] { margin-bottom: 6px; }
+  .add-meal textarea {
+    width: 100%;
+    min-height: 50px;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 13px;
+    margin-bottom: 6px;
+  }
+  .add-meal button {
+    width: 100%;
+    padding: 9px;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: white;
+    font-size: 13px;
+  }
+  #add-meal-status { font-size: 12px; color: var(--muted); margin-top: 4px; }
 
   .day-total {
     font-weight: 600;
@@ -139,7 +209,7 @@
   }
   #settings-status { font-size: 12px; margin-top: 6px; color: var(--muted); }
 
-  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 12px; color: var(--muted); margin-top: 8px; }
   .legend span { display: flex; align-items: center; gap: 4px; }
 
   .modal-overlay {
@@ -216,6 +286,13 @@
     <div class="day-total" id="day-total"></div>
     <div id="day-tags"></div>
     <div id="day-meals"></div>
+    <div class="add-meal">
+      <label>Add a meal to this day</label>
+      <input type="text" id="add-meal-tags" placeholder="Tags (comma separated)" />
+      <textarea id="add-meal-text" placeholder="e.g. 2 eggs, toast with butter"></textarea>
+      <button id="add-meal-btn">Log meal</button>
+      <div id="add-meal-status"></div>
+    </div>
   </div>
 
   <div class="card">
@@ -287,6 +364,7 @@
   current.setDate(1);
   let selectedDate = null;
   let searchTerm = "";
+  let editingIndex = null;
 
   const monthLabel = document.getElementById("month-label");
   const calendarEl = document.getElementById("calendar");
@@ -355,11 +433,58 @@
       `;
       cell.addEventListener("click", () => {
         selectedDate = dateStr;
+        editingIndex = null;
         renderCalendar();
         renderDayDetail(dateStr);
       });
       calendarEl.appendChild(cell);
     }
+  }
+
+  function itemsToLines(items) {
+    return items.map((i) => `${i.name} | ${i.quantity || ""} | ${i.calories}`).join("\n");
+  }
+
+  function parseItemLines(text) {
+    return text
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const [name, quantity, calories] = line.split("|").map((p) => (p || "").trim());
+        return { name, quantity, calories: Number(calories) || 0 };
+      })
+      .filter((i) => i.name);
+  }
+
+  function renderMealView(m, i) {
+    const time = new Date(m.time).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    const itemsText = m.items.map((it) => `${it.name} (${it.calories} kcal)`).join(", ");
+    const tagsText = m.tags.length ? ` &middot; ${m.tags.join(", ")}` : "";
+    return `<div class="meal">
+      <div class="meal-head">
+        <strong>${time} &middot; ${m.total_calories} kcal${tagsText}</strong>
+        <div class="meal-actions">
+          <button data-action="edit" data-index="${i}">Edit</button>
+          <button data-action="delete" data-index="${i}" class="danger">Delete</button>
+        </div>
+      </div>
+      <div class="items">${itemsText}</div>
+    </div>`;
+  }
+
+  function renderMealEdit(m, i) {
+    return `<div class="meal edit-form">
+      <label>Items (one per line: name | quantity | calories)</label>
+      <textarea data-role="items" data-index="${i}">${itemsToLines(m.items)}</textarea>
+      <div class="hint">Total recalculates automatically from these calorie values.</div>
+      <label style="margin-top:8px;">Tags (comma separated)</label>
+      <input type="text" data-role="tags" data-index="${i}" value="${m.tags.join(", ")}" />
+      <div class="row">
+        <button class="save" data-action="save" data-index="${i}">Save</button>
+        <button class="cancel" data-action="cancel" data-index="${i}">Cancel</button>
+      </div>
+    </div>`;
   }
 
   function renderDayDetail(dateStr) {
@@ -370,6 +495,7 @@
       document.getElementById("day-total").className = "day-total";
       document.getElementById("day-tags").innerHTML = "";
       document.getElementById("day-meals").innerHTML = "";
+      dayDetail.dataset.date = dateStr;
       return;
     }
 
@@ -384,18 +510,137 @@
       .join("");
 
     document.getElementById("day-meals").innerHTML = entry.meals
-      .map((m) => {
-        const time = new Date(m.time).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-        const itemsText = m.items.map((i) => `${i.name} (${i.calories} kcal)`).join(", ");
-        return `<div class="meal">
-          <strong>${time} &middot; ${m.total_calories} kcal</strong>
-          <div class="items">${itemsText}</div>
-        </div>`;
-      })
+      .map((m, i) => (editingIndex === i ? renderMealEdit(m, i) : renderMealView(m, i)))
       .join("");
 
+    dayDetail.dataset.date = dateStr;
     dayDetail.style.display = "block";
   }
+
+  document.getElementById("day-meals").addEventListener("click", async (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    const index = Number(btn.dataset.index);
+    const dateStr = dayDetail.dataset.date;
+
+    if (btn.dataset.action === "edit") {
+      editingIndex = index;
+      renderDayDetail(dateStr);
+    } else if (btn.dataset.action === "cancel") {
+      editingIndex = null;
+      renderDayDetail(dateStr);
+    } else if (btn.dataset.action === "delete") {
+      if (!confirm("Delete this meal entry?")) return;
+      btn.disabled = true;
+      try {
+        const secret = await ensureAppSecret();
+        const res = await fetch(WORKER_URL + "/delete-meal", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-App-Secret": secret },
+          body: JSON.stringify({ date: dateStr, index }),
+        });
+        if (res.status === 401) {
+          localStorage.removeItem("meal-tracker-secret");
+          throw new Error("Wrong password, try again.");
+        }
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to delete");
+
+        log[dateStr].meals.splice(index, 1);
+        log[dateStr].total_calories = data.day_total;
+        editingIndex = null;
+        renderCalendar();
+        renderDayDetail(dateStr);
+      } catch (err) {
+        alert("Error: " + err.message);
+      }
+    } else if (btn.dataset.action === "save") {
+      const form = btn.closest(".edit-form");
+      const itemsText = form.querySelector('[data-role="items"]').value;
+      const tagsText = form.querySelector('[data-role="tags"]').value;
+      const items = parseItemLines(itemsText);
+      if (!items.length) {
+        alert("Enter at least one item.");
+        return;
+      }
+      btn.disabled = true;
+      try {
+        const secret = await ensureAppSecret();
+        const res = await fetch(WORKER_URL + "/edit-meal", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-App-Secret": secret },
+          body: JSON.stringify({ date: dateStr, index, items, tags: tagsText }),
+        });
+        if (res.status === 401) {
+          localStorage.removeItem("meal-tracker-secret");
+          throw new Error("Wrong password, try again.");
+        }
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to save");
+
+        const totalCalories = items.reduce((sum, i) => sum + i.calories, 0);
+        log[dateStr].meals[index] = {
+          ...log[dateStr].meals[index],
+          items,
+          tags: tagsText.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean),
+          total_calories: totalCalories,
+        };
+        log[dateStr].total_calories = data.day_total;
+        editingIndex = null;
+        renderCalendar();
+        renderDayDetail(dateStr);
+      } catch (err) {
+        alert("Error: " + err.message);
+      }
+    }
+  });
+
+  document.getElementById("add-meal-btn").addEventListener("click", async () => {
+    const dateStr = dayDetail.dataset.date;
+    const textEl = document.getElementById("add-meal-text");
+    const tagsEl = document.getElementById("add-meal-tags");
+    const statusEl = document.getElementById("add-meal-status");
+    const text = textEl.value.trim();
+    const tags = tagsEl.value.trim();
+    if (!dateStr || !text) {
+      statusEl.textContent = "Enter a description first.";
+      return;
+    }
+
+    statusEl.textContent = "Logging…";
+    try {
+      const secret = await ensureAppSecret();
+      const res = await fetch(WORKER_URL + "/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-App-Secret": secret },
+        body: JSON.stringify({ text, tags, localDate: dateStr }),
+      });
+      if (res.status === 401) {
+        localStorage.removeItem("meal-tracker-secret");
+        throw new Error("Wrong password, try again.");
+      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to log meal");
+
+      if (!log[dateStr]) log[dateStr] = { meals: [], total_calories: 0 };
+      log[dateStr].meals.push({
+        time: new Date().toISOString(),
+        raw_input: text,
+        items: data.items,
+        tags: data.tags || [],
+        total_calories: data.meal_total,
+      });
+      log[dateStr].total_calories = data.total_today;
+
+      textEl.value = "";
+      tagsEl.value = "";
+      statusEl.textContent = "Logged.";
+      renderCalendar();
+      renderDayDetail(dateStr);
+    } catch (err) {
+      statusEl.textContent = "Error: " + err.message;
+    }
+  });
 
   document.getElementById("prev").addEventListener("click", () => {
     current.setMonth(current.getMonth() - 1);

@@ -19,10 +19,12 @@
     --accent-under: #1f6f5c;
     --border: #dfe4e2;
   }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; min-width: 0; }
   html, body {
     margin: 0;
     height: 100%;
+    overflow-x: hidden;
+    max-width: 100%;
     background: var(--bg);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
@@ -85,13 +87,22 @@
     color: var(--accent-over);
     border: 1px solid #f3c6c1;
   }
-  form {
+  #chat-form {
     display: flex;
-    gap: 8px;
+    flex-direction: column;
+    gap: 6px;
     padding: 10px;
     padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
     background: white;
     border-top: 1px solid var(--border);
+  }
+  .input-row { display: flex; gap: 8px; }
+  #tags-input {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-family: inherit;
   }
   textarea {
     flex: 1;
@@ -165,8 +176,11 @@
 <div id="status">Loading today's total&hellip;</div>
 <div id="messages"></div>
 <form id="chat-form">
-  <textarea id="input" rows="1" placeholder="e.g. 2 eggs, toast with butter, tags: breakfast vegetarian" required></textarea>
-  <button type="submit">Send</button>
+  <input type="text" id="tags-input" placeholder="Tags (comma separated), e.g. breakfast, vegetarian" />
+  <div class="input-row">
+    <textarea id="input" rows="1" placeholder="e.g. 2 eggs, toast with butter" required></textarea>
+    <button type="submit">Send</button>
+  </div>
 </form>
 
 <div class="modal-overlay hidden" id="password-overlay">
@@ -264,13 +278,17 @@
     }
   }
 
+  const tagsInput = document.getElementById("tags-input");
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const text = input.value.trim();
+    const tags = tagsInput.value.trim();
     if (!text) return;
 
-    addBubble(text, "user");
+    addBubble(tags ? `${text}\n[tags: ${tags}]` : text, "user");
     input.value = "";
+    tagsInput.value = "";
     input.disabled = true;
     form.querySelector("button").disabled = true;
 
@@ -279,7 +297,7 @@
       const res = await fetch(WORKER_URL + "/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-App-Secret": secret },
-        body: JSON.stringify({ text, localDate: localDateString() }),
+        body: JSON.stringify({ text, tags, localDate: localDateString() }),
       });
       if (res.status === 401) {
         localStorage.removeItem("meal-tracker-secret");
@@ -289,6 +307,17 @@
       if (!res.ok) throw new Error(data.error || "Something went wrong");
 
       addBubble(data.reply, "bot");
+      if (Array.isArray(data.items) && data.items.length) {
+        const lines = data.items.map((i) => {
+          const qty = i.quantity ? ` (${i.quantity})` : "";
+          return `${i.name}${qty} — ${i.calories} kcal`;
+        });
+        lines.push(`Total: ${data.meal_total} kcal`);
+        if (Array.isArray(data.tags) && data.tags.length) {
+          lines.push(`Tags: ${data.tags.join(", ")}`);
+        }
+        addBubble(lines.join("\n"), "bot");
+      }
       updateStatus(data.total_today, data.limit, data.over_limit);
       if (data.over_limit) {
         addBubble(`⚠️ That puts you over today's ${data.limit} kcal limit.`, "bot");
