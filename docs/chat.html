@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Log a meal</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#1f6f5c" />
+<link rel="icon" href="icon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="icon.svg" />
+<style>
+  :root {
+    --bg: #f4f6f5;
+    --bubble-user: #1f6f5c;
+    --bubble-user-text: #ffffff;
+    --bubble-bot: #ffffff;
+    --bubble-bot-text: #1a1a1a;
+    --accent-over: #c0392b;
+    --accent-under: #1f6f5c;
+    --border: #dfe4e2;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    padding: 14px 16px calc(10px + env(safe-area-inset-top, 0px));
+    padding-top: calc(14px + env(safe-area-inset-top, 0px));
+    background: var(--bubble-user);
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  header h1 { font-size: 17px; margin: 0; font-weight: 600; }
+  header a { color: white; text-decoration: none; font-size: 13px; opacity: 0.9; }
+  #status {
+    padding: 8px 16px;
+    font-size: 13px;
+    text-align: center;
+    background: var(--bubble-bot);
+    border-bottom: 1px solid var(--border);
+  }
+  #status.over { color: var(--accent-over); font-weight: 600; }
+  #status.under { color: var(--accent-under); }
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .bubble {
+    max-width: 80%;
+    padding: 10px 14px;
+    border-radius: 16px;
+    font-size: 15px;
+    line-height: 1.35;
+    white-space: pre-wrap;
+  }
+  .bubble.user {
+    align-self: flex-end;
+    background: var(--bubble-user);
+    color: var(--bubble-user-text);
+    border-bottom-right-radius: 4px;
+  }
+  .bubble.bot {
+    align-self: flex-start;
+    background: var(--bubble-bot);
+    color: var(--bubble-bot-text);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+  }
+  .bubble.error {
+    align-self: flex-start;
+    background: #fdecea;
+    color: var(--accent-over);
+    border: 1px solid #f3c6c1;
+  }
+  form {
+    display: flex;
+    gap: 8px;
+    padding: 10px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    background: white;
+    border-top: 1px solid var(--border);
+  }
+  textarea {
+    flex: 1;
+    resize: none;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 15px;
+    font-family: inherit;
+    max-height: 100px;
+  }
+  button {
+    background: var(--bubble-user);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 0 18px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  button:disabled { opacity: 0.5; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Log a meal</h1>
+  <a href="index.html">Calendar &rarr;</a>
+</header>
+<div id="status">Loading today's total&hellip;</div>
+<div id="messages"></div>
+<form id="chat-form">
+  <textarea id="input" rows="1" placeholder="e.g. 2 eggs, toast with butter, tags: breakfast vegetarian" required></textarea>
+  <button type="submit">Send</button>
+</form>
+
+<script>
+  // Fill in the URL of your deployed Cloudflare Worker, e.g.
+  // "https://meal-tracker.yourname.workers.dev"
+  const WORKER_URL = "REPLACE_WITH_YOUR_WORKER_URL";
+
+  function getAppSecret() {
+    let secret = localStorage.getItem("meal-tracker-secret");
+    if (!secret) {
+      secret = prompt("Enter your app password (set as APP_SECRET on the Worker):") || "";
+      localStorage.setItem("meal-tracker-secret", secret);
+    }
+    return secret;
+  }
+
+  const messagesEl = document.getElementById("messages");
+  const statusEl = document.getElementById("status");
+  const form = document.getElementById("chat-form");
+  const input = document.getElementById("input");
+
+  function addBubble(text, kind) {
+    const div = document.createElement("div");
+    div.className = "bubble " + kind;
+    div.textContent = text;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function updateStatus(total, limit, overLimit) {
+    statusEl.textContent = `Today: ${total} / ${limit} kcal`;
+    statusEl.className = overLimit ? "over" : "under";
+  }
+
+  function localDateString() {
+    const d = new Date();
+    const offset = d.getTimezoneOffset();
+    const local = new Date(d.getTime() - offset * 60000);
+    return local.toISOString().slice(0, 10);
+  }
+
+  // Best-effort initial status from the public log/settings files (read-only,
+  // no Worker call needed just to display today's running total).
+  async function loadInitialStatus() {
+    try {
+      const [logRes, settingsRes] = await Promise.all([
+        fetch("log.json", { cache: "no-store" }),
+        fetch("settings.json", { cache: "no-store" }),
+      ]);
+      const log = logRes.ok ? await logRes.json() : {};
+      const settings = settingsRes.ok ? await settingsRes.json() : { daily_limit: 2000 };
+      const today = localDateString();
+      const total = log[today] ? log[today].total_calories : 0;
+      updateStatus(total, settings.daily_limit, total >= settings.daily_limit);
+    } catch (err) {
+      statusEl.textContent = "Couldn't load today's total";
+    }
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+
+    addBubble(text, "user");
+    input.value = "";
+    input.disabled = true;
+    form.querySelector("button").disabled = true;
+
+    try {
+      const res = await fetch(WORKER_URL + "/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-App-Secret": getAppSecret() },
+        body: JSON.stringify({ text, localDate: localDateString() }),
+      });
+      if (res.status === 401) {
+        localStorage.removeItem("meal-tracker-secret");
+        throw new Error("Wrong password, try sending your message again.");
+      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Something went wrong");
+
+      addBubble(data.reply, "bot");
+      updateStatus(data.total_today, data.limit, data.over_limit);
+      if (data.over_limit) {
+        addBubble(`⚠️ That puts you over today's ${data.limit} kcal limit.`, "bot");
+      }
+    } catch (err) {
+      addBubble("Error: " + err.message, "error");
+    } finally {
+      input.disabled = false;
+      form.querySelector("button").disabled = false;
+      input.focus();
+    }
+  });
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      form.requestSubmit();
+    }
+  });
+
+  loadInitialStatus();
+</script>
+</body>
+</html>

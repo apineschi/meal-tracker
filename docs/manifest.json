@@ -1,0 +1,11 @@
+{
+  "name": "Log a meal",
+  "short_name": "Log meal",
+  "start_url": "chat.html",
+  "display": "standalone",
+  "background_color": "#1f6f5c",
+  "theme_color": "#1f6f5c",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
