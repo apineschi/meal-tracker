@@ -581,7 +581,7 @@ async function handleChat(request, env, origin) {
   if (overLimit) {
     await postNtfy(
       env,
-      `Daily total is ${dailyTotal} kcal, over your ${limit} kcal limit.`,
+      `Daily total is ${dailyTotal} kcal, ${dailyTotal - limit} kcal over your ${limit} kcal limit.`,
       "Calorie limit reached"
     );
   }

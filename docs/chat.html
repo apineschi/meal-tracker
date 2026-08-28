@@ -525,7 +525,8 @@
       }
       updateStatus(data.total_today, data.limit, data.over_limit);
       if (data.over_limit) {
-        addBubble(`⚠️ That puts you over today's ${data.limit} kcal limit.`, "bot");
+        const over = data.total_today - data.limit;
+        addBubble(`⚠️ That puts you ${over} kcal over today's ${data.limit} kcal limit.`, "bot");
       }
     } catch (err) {
       addBubble("Error: " + err.message, "error");
