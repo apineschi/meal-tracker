@@ -142,6 +142,19 @@
     font-size: 13px;
   }
   .meal-tags { margin-top: 4px; }
+  .usda-alt-block { margin-top: 8px; }
+  .usda-alt-label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .usda-alt-buttons { display: flex; flex-direction: column; gap: 4px; }
+  .usda-alt-buttons button {
+    background: white;
+    color: var(--accent);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-size: 12px;
+    text-align: left;
+  }
+  .usda-alt-buttons button:disabled { opacity: 0.5; }
   .meal:first-child { border-top: none; }
   .meal .items { color: var(--muted); margin-top: 2px; }
   .meal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
@@ -633,6 +646,19 @@
     const tagsHtml = m.tags.length
       ? `<div class="meal-tags">${m.tags.map((t) => `<span class="tag-chip">${t}</span>`).join("")}</div>`
       : "";
+    const altsHtml = m.items
+      .map((it, itemIdx) => {
+        if (!Array.isArray(it.usda_alternatives) || !it.usda_alternatives.length) return "";
+        const label = `Not sure about "${escapeHtml(it.name)}"? Using: ${escapeHtml(it.usda_food)} (${it.calories} kcal)`;
+        const buttons = it.usda_alternatives
+          .map(
+            (alt, altIdx) =>
+              `<button type="button" data-action="use-alt" data-meal-index="${i}" data-item-index="${itemIdx}" data-alt-index="${altIdx}">${escapeHtml(alt.description)} — ${alt.calories} kcal</button>`
+          )
+          .join("");
+        return `<div class="usda-alt-block"><div class="usda-alt-label">${label}</div><div class="usda-alt-buttons">${buttons}</div></div>`;
+      })
+      .join("");
     return `<div class="meal">
       <div class="meal-head">
         <strong>${time} &middot; ${m.total_calories} kcal</strong>
@@ -643,6 +669,7 @@
       </div>
       ${tagsHtml}
       <div class="items">${itemsText}</div>
+      ${altsHtml}
     </div>`;
   }
 
@@ -814,6 +841,47 @@
         renderDayDetail(dateStr);
       } catch (err) {
         alert("Error: " + err.message);
+      }
+    } else if (btn.dataset.action === "use-alt") {
+      const mealIndex = Number(btn.dataset.mealIndex);
+      const itemIndex = Number(btn.dataset.itemIndex);
+      const altIndex = Number(btn.dataset.altIndex);
+      const meal = log[dateStr].meals[mealIndex];
+      const item = meal.items[itemIndex];
+      const alt = item.usda_alternatives[altIndex];
+
+      btn.closest(".usda-alt-buttons").querySelectorAll("button").forEach((b) => (b.disabled = true));
+      try {
+        meal.items[itemIndex] = {
+          ...item,
+          calories: alt.calories,
+          unit_calories: alt.unit_calories,
+          usda_food: alt.description,
+          usda_kcal_per_100g: alt.kcal_per_100g,
+          usda_url: alt.url,
+          usda_source: true,
+        };
+        meal.total_calories = meal.items.reduce((sum, it) => sum + it.calories, 0);
+
+        const secret = await ensureAppSecret();
+        const res = await fetch(WORKER_URL + "/edit-meal", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-App-Secret": secret },
+          body: JSON.stringify({ date: dateStr, index: mealIndex, items: meal.items, tags: meal.tags.join(", ") }),
+        });
+        if (res.status === 401) {
+          localStorage.removeItem("meal-tracker-secret");
+          throw new Error("Wrong password, try again.");
+        }
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to update");
+
+        log[dateStr].total_calories = data.day_total;
+        renderCalendar();
+        renderDayDetail(dateStr);
+      } catch (err) {
+        alert("Error: " + err.message);
+        btn.closest(".usda-alt-buttons").querySelectorAll("button").forEach((b) => (b.disabled = false));
       }
     }
   });

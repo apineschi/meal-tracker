@@ -154,13 +154,41 @@ what "USDA grounding" (below) exists to fix for the text flow.
 
 If `USDA_API_KEY` is set (free key from USDA's FoodData Central), `callWorkersAI()`
 runs a second pass: after the model's first attempt at parsing a text
-message into items, each item's `name` is looked up via
-`lookupUsdaFood()` against FoodData Central's Foundation/SR Legacy datasets
-(generic/raw foods — falls back to the full catalog including Branded
-products if nothing generic matches, and rejects matches whose description
-names a component/variant the query didn't ask for, e.g. "egg" won't accept
-"egg white"). Any real "kcal per 100g" facts found are handed back to the
-model in a second call for a refined pass.
+message into items, each item's `name` is looked up via `lookupUsdaFood()`,
+checking datasets in order — **Foundation** (USDA's newer, cleaner
+plain-ingredient set) first, then **SR Legacy** (a much larger, older set
+that also mixes in plenty of processed/prepared foods, so a noisier second
+choice), then the full catalog including Branded products as a last resort.
+
+`isPlausibleMatch()` rejects any candidate whose description is missing a
+word from the query, rather than trying to maintain a list of "bad" words to
+watch for — that's what catches a branded "MCDONALD'S, Hamburger" for a
+"hamburger bun" query (missing "bun") or an "egg white" for a plain "egg"
+query (an anticipated bad word would only ever catch mismatches seen before;
+missing-word-checking catches whatever mismatch actually turns up).
+`pickBestFood()` deliberately has no "close enough" fallback — if nothing
+across all three dataset stages passes both the word-overlap and calorie
+plausibility checks, that item just isn't grounded and falls back to the
+model's own estimate, since a mismatched food presented as an authoritative
+USDA fact is worse than an ungrounded estimate labeled as such. This is
+still fundamentally best-effort text search, not a guaranteed-correct
+lookup — the visible USDA link and matched food name in the reply exist
+specifically so a future bad match is something the reader can catch by
+eye, not something hidden behind a confident-looking number.
+
+When multiple plausible matches would give meaningfully different answers
+(kcal/100g differing by more than 15%), `lookupUsdaFood()` keeps up to three
+as `alternatives` alongside the chosen best match, rather than silently
+picking one. `callWorkersAI()` recomputes each alternative's calories using
+the exact same gram basis as the chosen match, so switching is a straight
+swap. `handleChat()` returns the new meal's `date`/`meal_index` specifically
+so the front end can call `/edit-meal` again later to apply a chosen
+alternative without needing a fresh model call — the arithmetic was already
+done, only the item's stored fields change. Both `chat.html` (a picker
+rendered under the item breakdown) and `index.html` (a picker under each
+logged item) implement this the same way: mutate a local copy of that
+meal's `items`, POST the whole array to `/edit-meal`, then reflect the
+result.
 
 **The actual calorie arithmetic happens in code, not inside the model.**
 Earlier versions asked the model to convert "kcal per 100g" to the real

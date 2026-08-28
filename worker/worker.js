@@ -282,37 +282,40 @@ async function usdaSearchList(env, query, dataType) {
   return data.foods || [];
 }
 
-// FDC often splits a plain food into separate component/variant records (egg
-// -> "egg white" / "egg yolk" / "egg substitute", milk -> "dry milk", chicken
-// -> "chicken gizzard") that can rank above the plain whole-food entry in
-// search results. If the description names a component/variant the user's
-// own query didn't ask for, it's very likely the wrong match even though its
-// calorie value alone looks perfectly plausible.
-const USDA_COMPONENT_QUALIFIERS = [
-  "white", "yolk", "substitute", "powder", "dried", "dry", "shell", "gizzard", "liver", "skin",
-];
-
+// A general word-overlap check beats a hand-maintained list of "bad" words -
+// it catches whatever mismatch actually turns up (a branded "MCDONALD'S,
+// Hamburger" for a query of "hamburger bun", an "egg white" for "egg", a
+// canned sauce for "tomato") without needing to anticipate each one. Every
+// meaningful word in the query must actually appear in the candidate's
+// description, or it's rejected outright rather than accepted as "close
+// enough". Short filler words (2 letters or fewer) are ignored.
 function isPlausibleMatch(query, description) {
-  const q = query.toLowerCase();
   const d = description.toLowerCase();
-  return !USDA_COMPONENT_QUALIFIERS.some((word) => d.includes(word) && !q.includes(word));
+  const qWords = query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length > 2);
+  if (!qWords.length) return true;
+  return qWords.every((w) => d.includes(w));
 }
 
-function pickBestFood(query, foods) {
+function findPlausibleMatches(query, foods) {
+  // No "close enough" fallback here on purpose: presenting a mismatched food
+  // as if it were an authoritative USDA fact is worse than just not grounding
+  // this item at all and falling back to the model's own estimate.
+  const matches = [];
   for (const food of foods) {
     if (!isPlausibleMatch(query, food.description)) continue;
     const kcal = extractKcalPer100g(food);
-    if (kcal != null) return { food, kcal };
+    if (kcal != null) matches.push({ food, kcal });
   }
-  // Nothing both well-matched and plausible - fall back to the first
-  // plausible-calorie result even with a mismatched qualifier, rather than
-  // giving up on grounding this item entirely.
-  for (const food of foods) {
-    const kcal = extractKcalPer100g(food);
-    if (kcal != null) return { food, kcal };
-  }
-  return null;
+  return matches;
 }
+
+// Only worth asking about when candidates would actually give meaningfully
+// different answers - two entries both around 150 kcal/100g aren't worth
+// bothering the reader over.
+const USDA_ALTERNATIVE_THRESHOLD = 0.15;
 
 async function lookupUsdaFood(env, query) {
   if (!env.USDA_API_KEY) {
@@ -320,17 +323,33 @@ async function lookupUsdaFood(env, query) {
     return null;
   }
   try {
-    // Generic/raw foods (Foundation, SR Legacy) first - much better match for
-    // typical logged ingredients than packaged "Branded" products. Fall back
-    // to the full catalog (including Branded) if nothing generic turns up.
-    let best = pickBestFood(query, await usdaSearchList(env, query, "Foundation,SR Legacy"));
-    if (!best) {
-      best = pickBestFood(query, await usdaSearchList(env, query, null));
+    // Foundation first: USDA's newer, cleaner "plain ingredient" dataset.
+    // SR Legacy is a much larger, older set that also includes plenty of
+    // processed/prepared foods (sauces, canned goods) alongside raw
+    // ingredients, so it's a noisier second choice. Only fall back to the
+    // full catalog (including Branded products) if neither generic dataset
+    // has a plausible, well-matched entry.
+    let matches = findPlausibleMatches(query, await usdaSearchList(env, query, "Foundation"));
+    if (!matches.length) matches = findPlausibleMatches(query, await usdaSearchList(env, query, "SR Legacy"));
+    if (!matches.length) matches = findPlausibleMatches(query, await usdaSearchList(env, query, null));
+    if (!matches.length) {
+      console.log(`No plausible USDA match for "${query}" - using model estimate only`);
+      return null;
     }
-    if (!best) return null;
 
+    const best = matches[0];
     console.log(`USDA match for "${query}": "${best.food.description}" = ${best.kcal} kcal/100g`);
-    return { description: best.food.description, kcalPer100g: best.kcal, fdcId: best.food.fdcId };
+
+    const alternatives = matches
+      .filter((m) => Math.abs(m.kcal - best.kcal) / best.kcal > USDA_ALTERNATIVE_THRESHOLD)
+      .slice(0, 3)
+      .map((m) => ({ description: m.food.description, kcalPer100g: m.kcal, fdcId: m.food.fdcId }));
+
+    if (alternatives.length) {
+      console.log(`USDA found ${alternatives.length} meaningfully different alternative(s) for "${query}"`);
+    }
+
+    return { description: best.food.description, kcalPer100g: best.kcal, fdcId: best.food.fdcId, alternatives };
   } catch (err) {
     console.error("USDA lookup failed", err);
     return null;
@@ -448,7 +467,26 @@ async function callWorkersAI(env, message) {
     const unitCalories = count ? Math.round(total / count) : total;
     const unitLabel = it.unit_label || (count ? it.name : "100g");
 
-    return { ...withSource, calories: total, unit_calories: unitCalories, unit_label: unitLabel };
+    // Alternatives get the exact same gram basis so switching to one is a
+    // straight swap, not a re-estimate.
+    const usdaAlternatives = (food.alternatives || []).map((alt) => {
+      const altTotal = Math.round((alt.kcalPer100g * grams) / 100);
+      return {
+        description: alt.description,
+        kcal_per_100g: Math.round(alt.kcalPer100g),
+        url: alt.fdcId ? `https://fdc.nal.usda.gov/food-details/${alt.fdcId}/nutrients` : null,
+        calories: altTotal,
+        unit_calories: count ? Math.round(altTotal / count) : altTotal,
+      };
+    });
+
+    return {
+      ...withSource,
+      calories: total,
+      unit_calories: unitCalories,
+      unit_label: unitLabel,
+      usda_alternatives: usdaAlternatives.length ? usdaAlternatives : undefined,
+    };
   });
 
   // Keep the meal total consistent with whatever just got overridden above.
@@ -613,6 +651,7 @@ async function handleChat(request, env, origin) {
   };
 
   log[date].meals.push(meal);
+  const mealIndex = log[date].meals.length - 1;
   log[date].total_calories = log[date].meals.reduce((sum, m) => sum + m.total_calories, 0);
 
   await putJsonFile(
@@ -644,6 +683,8 @@ async function handleChat(request, env, origin) {
       total_today: dailyTotal,
       limit,
       over_limit: overLimit,
+      date,
+      meal_index: mealIndex,
     },
     200,
     origin
