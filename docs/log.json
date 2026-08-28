@@ -337,9 +337,30 @@
         ],
         "tags": [],
         "total_calories": 740
+      },
+      {
+        "time": "2026-08-28T15:57:34.141Z",
+        "raw_input": "5 eggs",
+        "from_photo": false,
+        "items": [
+          {
+            "name": "eggs",
+            "quantity": "5",
+            "calories": 370,
+            "unit_label": "egg",
+            "unit_calories": 74,
+            "estimated_gram_weight": 250,
+            "usda_source": true,
+            "usda_food": "Eggs, Grade A, Large, egg whole",
+            "usda_kcal_per_100g": 148,
+            "usda_url": "https://fdc.nal.usda.gov/food-details/748967/nutrients"
+          }
+        ],
+        "tags": [],
+        "total_calories": 370
       }
     ],
-    "total_calories": 6565
+    "total_calories": 6935
   },
   "2026-08-13": {
     "meals": [
