@@ -37,11 +37,34 @@ const CALORIE_SYSTEM_PROMPT =
   "possibly including tags like 'lunch' or 'vegetarian'. Break it into individual food " +
   "items, estimate reasonable calorie values per item using standard nutritional knowledge, " +
   "sum the total, and extract any tags (lowercase). If quantities are vague, assume a " +
-  "typical single serving.\n\n" +
-  "Respond with ONLY a single JSON object and no other text, in exactly this shape:\n" +
-  '{"items":[{"name":"...","quantity":"...","calories":123}],"total_calories":123,"tags":["..."],"reply":"..."}\n\n' +
-  "\"reply\" is a short, friendly one-to-two sentence confirmation of what was logged and " +
-  "its total calories - do not mention the daily total there, that is appended separately.";
+  "typical single serving. 'reply' should be a short, friendly one-to-two sentence " +
+  "confirmation of what was logged and its total calories - do not mention the daily " +
+  "total there, that is appended separately.";
+
+// Enforced via response_format below (Workers AI "JSON Mode") rather than
+// hoping the model follows a text instruction - much more reliable, though
+// Cloudflare still can't guarantee 100% schema compliance on every model.
+const MEAL_JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          quantity: { type: "string" },
+          calories: { type: "number" },
+        },
+        required: ["name", "calories"],
+      },
+    },
+    total_calories: { type: "number" },
+    tags: { type: "array", items: { type: "string" } },
+    reply: { type: "string" },
+  },
+  required: ["items", "total_calories", "tags", "reply"],
+};
 
 function corsHeaders(origin) {
   return {
@@ -112,31 +135,26 @@ async function callWorkersAI(env, message) {
       { role: "system", content: CALORIE_SYSTEM_PROMPT },
       { role: "user", content: message },
     ],
-    stream: false,
+    response_format: { type: "json_schema", json_schema: MEAL_JSON_SCHEMA },
   });
 
-  let raw = "";
-  if (typeof result === "string") {
-    raw = result;
-  } else if (result && typeof result.response === "string") {
-    raw = result.response;
-  } else {
-    raw = JSON.stringify(result || "");
+  // In JSON Mode, result.response is normally the already-parsed object, but
+  // fall back to parsing it as a JSON string in case a model/version returns
+  // it that way instead.
+  let parsed = result && result.response;
+  if (typeof parsed === "string") {
+    const match = parsed.match(/\{[\s\S]*\}/);
+    if (!match) {
+      throw new Error("Couldn't parse a reply from the model - try rephrasing your message.");
+    }
+    try {
+      parsed = JSON.parse(match[0]);
+    } catch (err) {
+      throw new Error("Couldn't parse a reply from the model - try rephrasing your message.");
+    }
   }
 
-  const match = raw.match(/\{[\s\S]*\}/);
-  if (!match) {
-    throw new Error("Couldn't parse a reply from the model - try rephrasing your message.");
-  }
-
-  let parsed;
-  try {
-    parsed = JSON.parse(match[0]);
-  } catch (err) {
-    throw new Error("Couldn't parse a reply from the model - try rephrasing your message.");
-  }
-
-  if (!Array.isArray(parsed.items) || typeof parsed.total_calories !== "number") {
+  if (!parsed || !Array.isArray(parsed.items) || typeof parsed.total_calories !== "number") {
     throw new Error("Model response was missing required fields - try rephrasing your message.");
   }
 
