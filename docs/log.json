@@ -48,38 +48,6 @@
         "total_calories": 405
       },
       {
-        "time": "2026-08-28T15:08:40.747Z",
-        "raw_input": "3/4 cup of milk, one egg, pork chop",
-        "from_photo": false,
-        "items": [
-          {
-            "name": "milk",
-            "quantity": "",
-            "calories": 333,
-            "unit_label": "30ml (30g)",
-            "unit_calories": 55.72
-          },
-          {
-            "name": "egg",
-            "quantity": "",
-            "calories": 55,
-            "unit_label": "egg",
-            "unit_calories": 55
-          },
-          {
-            "name": "pork chop",
-            "quantity": "",
-            "calories": 200,
-            "unit_label": "pork chop",
-            "unit_calories": 200
-          }
-        ],
-        "tags": [
-          "dinner"
-        ],
-        "total_calories": 588
-      },
-      {
         "time": "2026-08-28T15:17:38.501Z",
         "raw_input": "1/2 cup milk, beef patty, half a head of lettuce",
         "from_photo": false,
@@ -444,7 +412,7 @@
         "total_calories": 320
       }
     ],
-    "total_calories": 8249
+    "total_calories": 7661
   },
   "2026-08-13": {
     "meals": [
