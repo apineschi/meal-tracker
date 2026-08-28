@@ -145,9 +145,39 @@ models catalog):
   visible portion weight or hidden ingredients like oil and sauce, would be
   considerably less reliable than either of the above.
 
-Either path, estimates come from the model's general knowledge (or, for
-labels/menus with printed numbers, a direct read), not a nutrition database —
-treat them as reasonable ballpark figures, not lab-grade precision.
+Either path, estimates ultimately come from the model's general knowledge —
+it has no internet access and no built-in nutrition database, so left alone
+it's recalling patterns from training data, not looking anything up. That's
+what "USDA grounding" (below) exists to fix for the text flow.
+
+## USDA grounding (optional, improves accuracy)
+
+If `USDA_API_KEY` is set (free key from USDA's FoodData Central), `callWorkersAI()`
+runs a second pass: after the model's first attempt at parsing a text
+message into items, each item's `name` is looked up via
+`lookupUsdaFood()` against FoodData Central's Foundation/SR Legacy datasets
+(generic/raw foods — falls back to the full catalog including Branded
+products if nothing generic matches). Any real "kcal per 100g" facts found
+are handed back to the model in a second call, which recomputes the total
+using those authoritative numbers instead of memory, converting to whatever
+quantity was actually logged (e.g. scaling "143 kcal per 100g" to the real
+weight eaten) — the arithmetic and unit conversion stay inside the model's
+own reasoning, only the base nutrition fact is externally sourced.
+
+This is a pure accuracy improvement layered on top of the existing flow,
+never a dependency: `USDA_API_KEY` unset, a lookup finding no match, or the
+grounded second pass erroring all fall back cleanly to the original
+model-only estimate (`callWorkersAI()`'s `firstPass`). The same lookup is
+also used in `handleEstimateItem()` (the edit UI's per-item recalculate
+button), just as a single fact folded into one model call rather than a
+two-pass round trip, since there's no separate "first pass" needed there —
+the typed description already tells us what to look up.
+
+Deliberately not extended to the photo/vision path: a nutrition label
+already gives an exact printed number (no lookup needed), and grounding menu
+photo estimates would need matching a USDA generic food to whatever the menu's
+own ingredient list says, which is a fuzzier problem than matching a plain
+typed food name — left as model-only estimation for now.
 
 ## Editing and deleting meals
 

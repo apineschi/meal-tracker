@@ -25,6 +25,15 @@
  *   GITHUB_OWNER       - e.g. "apineschi"
  *   GITHUB_REPO        - e.g. "meal-tracker"
  *   ALLOWED_ORIGIN     - e.g. "https://apineschi.github.io"
+ *
+ * Optional secret (improves calorie accuracy, everything works without it):
+ *   USDA_API_KEY       - free key from fdc.nal.usda.gov/api-key-signup. When
+ *                        set, real USDA nutrition facts are looked up per
+ *                        item and fed back to the model as grounding instead
+ *                        of relying purely on its memorized "knowledge". If
+ *                        unset, or a lookup finds nothing, logging still
+ *                        works exactly as before - this only ever improves
+ *                        results, never breaks them.
  */
 
 // Check the Workers AI models catalog (dashboard > AI > Models, or
@@ -223,16 +232,84 @@ function extractMealJson(result, errorHint) {
   return parsed;
 }
 
-async function callWorkersAI(env, message) {
+async function usdaSearch(env, query, dataType) {
+  let url =
+    `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${env.USDA_API_KEY}` +
+    `&query=${encodeURIComponent(query)}&pageSize=3`;
+  if (dataType) url += `&dataType=${encodeURIComponent(dataType)}`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const data = await res.json();
+  return (data.foods && data.foods[0]) || null;
+}
+
+async function lookupUsdaFood(env, query) {
+  if (!env.USDA_API_KEY) return null;
+  try {
+    // Generic/raw foods (Foundation, SR Legacy) first - much better match for
+    // typical logged ingredients than packaged "Branded" products. Fall back
+    // to the full catalog (including Branded) if nothing generic turns up.
+    let food = await usdaSearch(env, query, "Foundation,SR Legacy");
+    if (!food) food = await usdaSearch(env, query, null);
+    if (!food) return null;
+
+    const energy = (food.foodNutrients || []).find(
+      (n) => n.nutrientName === "Energy" && n.unitName === "KCAL"
+    );
+    if (!energy) return null;
+
+    return { description: food.description, kcalPer100g: energy.value };
+  } catch (err) {
+    console.error("USDA lookup failed", err);
+    return null;
+  }
+}
+
+async function runCalorieModel(env, systemPrompt, message) {
   const result = await env.AI.run(AI_MODEL, {
     messages: [
-      { role: "system", content: CALORIE_SYSTEM_PROMPT },
+      { role: "system", content: systemPrompt },
       { role: "user", content: message },
     ],
     response_format: { type: "json_schema", json_schema: MEAL_JSON_SCHEMA },
   });
 
   return extractMealJson(result, "try rephrasing your message.");
+}
+
+async function callWorkersAI(env, message) {
+  const firstPass = await runCalorieModel(env, CALORIE_SYSTEM_PROMPT, message);
+
+  const facts = [];
+  for (const item of firstPass.items) {
+    const food = await lookupUsdaFood(env, item.name);
+    if (food) {
+      facts.push(`- ${item.name}: USDA "${food.description}" has ${Math.round(food.kcalPer100g)} kcal per 100g.`);
+    }
+  }
+
+  if (!facts.length) {
+    return firstPass;
+  }
+
+  const groundedPrompt =
+    CALORIE_SYSTEM_PROMPT +
+    "\n\nYou already made an initial pass at this meal. Below are authoritative USDA " +
+    "nutrition facts for some of the items - use them instead of your own memory for those " +
+    "items, converting from the 100g figure to whatever quantity was actually stated (e.g. " +
+    "scale '143 kcal per 100g' to the real weight/count logged). For any item with no fact " +
+    "provided, keep using your own best estimate. Recompute the total and per-unit figures " +
+    "to match.\n\nUSDA facts:\n" +
+    facts.join("\n");
+
+  try {
+    return await runCalorieModel(env, groundedPrompt, message);
+  } catch (err) {
+    // Grounding is a pure accuracy improvement - if the second pass fails for
+    // any reason, the ungrounded first pass is still a perfectly valid result.
+    console.error("Grounded re-pass failed, using first-pass estimate", err);
+    return firstPass;
+  }
 }
 
 async function callWorkersAIVision(env, imageDataUrl, caption) {
@@ -288,6 +365,13 @@ async function handleEstimateItem(request, env, origin) {
     return jsonResponse({ error: "Missing 'description' field" }, 400, origin);
   }
 
+  const food = await lookupUsdaFood(env, description);
+  const factLine = food
+    ? `\n\nAuthoritative USDA fact: "${food.description}" has ${Math.round(food.kcalPer100g)} ` +
+      "kcal per 100g - if this is a good match for the description, use it (converted to the " +
+      "actual stated quantity) instead of your own memory."
+    : "";
+
   const result = await env.AI.run(AI_MODEL, {
     messages: [
       {
@@ -299,7 +383,8 @@ async function handleEstimateItem(request, env, origin) {
           "single serving. Also report 'unit_label' (a short description of one natural " +
           "unit, no leading number or article, e.g. 'egg', '100g') and 'unit_calories' " +
           "(that one unit's calories) - if the description already is one natural unit, " +
-          "unit_calories should equal calories.",
+          "unit_calories should equal calories." +
+          factLine,
       },
       { role: "user", content: description },
     ],

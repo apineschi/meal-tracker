@@ -40,6 +40,17 @@ what keeps the whole app at $0.
 - **App password**: any password you'll remember — this is what stops
   strangers from calling your Worker. You'll type it once on your phone.
 
+### 4b. (Optional but recommended) Get a free USDA nutrition API key
+
+This meaningfully improves calorie accuracy by grounding the model in real
+nutrition data instead of pure memory — see ARCHITECTURE.md's "USDA
+grounding" section for how it works. Everything still works without this
+step, just with less accurate estimates.
+
+1. Sign up at [fdc.nal.usda.gov/api-key-signup](https://fdc.nal.usda.gov/api-key-signup) —
+   free, no card, near-instant.
+2. Keep the key for step 5.
+
 ### 5. Deploy the Worker
 
 1. Go to [dash.cloudflare.com](https://dash.cloudflare.com), sign up free
@@ -56,6 +67,9 @@ what keeps the whole app at $0.
    - `GITHUB_TOKEN` — from step 3. Encrypt it.
    - `NTFY_TOPIC` — from step 4. Encrypt it.
    - `APP_SECRET` — from step 4. Encrypt it.
+   - `USDA_API_KEY` — from step 4b, if you got one. Encrypt it. (Skip this
+     one if you'd rather not bother — everything still works, just with
+     less accurate estimates.)
    - `GITHUB_OWNER` — `apineschi`
    - `GITHUB_REPO` — `meal-tracker`
    - `ALLOWED_ORIGIN` — `https://apineschi.github.io`
