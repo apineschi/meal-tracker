@@ -380,6 +380,10 @@ async function runCalorieModel(env, systemPrompt, message) {
       { role: "user", content: message },
     ],
     response_format: { type: "json_schema", json_schema: MEAL_JSON_SCHEMA },
+    // The schema grew (6 fields per item now) - a multi-item meal can need a
+    // few hundred tokens of JSON. Without enough headroom the response gets
+    // cut off mid-object and fails to parse entirely.
+    max_tokens: 3000,
   });
 
   return extractMealJson(result, "try rephrasing your message.");
@@ -508,6 +512,7 @@ async function callWorkersAIVision(env, imageDataUrl, caption) {
       },
     ],
     response_format: { type: "json_schema", json_schema: MEAL_JSON_SCHEMA },
+    max_tokens: 3000,
   });
 
   return extractMealJson(result, "try a clearer photo, or add a short text caption.");
@@ -572,6 +577,7 @@ async function handleEstimateItem(request, env, origin) {
       { role: "user", content: description },
     ],
     response_format: { type: "json_schema", json_schema: ITEM_CALORIE_SCHEMA },
+    max_tokens: 1000,
   });
 
   let parsed = result && result.response;
