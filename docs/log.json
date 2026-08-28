@@ -8,34 +8,44 @@
           {
             "name": "tomato",
             "quantity": "",
-            "calories": 22
+            "calories": 22,
+            "unit_label": "tomato",
+            "unit_calories": 22
           },
           {
-            "name": "light mozzarella cheese",
-            "quantity": "120g",
-            "calories": 200
+            "name": "120g light mozzarella cheese",
+            "quantity": "",
+            "calories": 200,
+            "unit_label": "120g light mozzarella cheese",
+            "unit_calories": 200
           },
           {
             "name": "artisan bread",
             "quantity": "",
-            "calories": 89
+            "calories": 89,
+            "unit_label": "artisan bread",
+            "unit_calories": 89
           },
           {
-            "name": "olive oil",
+            "name": "10g olive oil",
             "quantity": "",
-            "calories": 120
+            "calories": 88,
+            "unit_label": "100g",
+            "unit_calories": 880
           },
           {
             "name": "balsamic vinegar",
             "quantity": "",
-            "calories": 6
+            "calories": 6,
+            "unit_label": "balsamic vinegar",
+            "unit_calories": 6
           }
         ],
         "tags": [
           "lunch",
           "vegetarian"
         ],
-        "total_calories": 437
+        "total_calories": 405
       },
       {
         "time": "2026-08-28T14:16:08.512Z",
@@ -464,7 +474,7 @@
         "total_calories": 320
       }
     ],
-    "total_calories": 8826
+    "total_calories": 8794
   },
   "2026-08-13": {
     "meals": [
