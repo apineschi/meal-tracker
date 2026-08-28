@@ -100,6 +100,7 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    text-align: center;
   }
   .day.match { background: #fff7d6; border-color: #e8d27a; }
 
@@ -209,6 +210,18 @@
   }
   #settings-status { font-size: 12px; margin-top: 6px; color: var(--muted); }
 
+  #search-results { margin-top: 10px; }
+  .search-hit {
+    border-top: 1px solid var(--border);
+    padding: 8px 0;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .search-hit:first-child { border-top: none; }
+  .search-hit .date { font-weight: 600; }
+  .search-hit .snippet { color: var(--muted); margin-top: 2px; }
+  .search-empty { font-size: 13px; color: var(--muted); margin-top: 8px; }
+
   .legend { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 12px; color: var(--muted); margin-top: 8px; }
   .legend span { display: flex; align-items: center; gap: 4px; }
 
@@ -264,7 +277,11 @@
 
   <div class="card">
     <label for="search">Search by tag or ingredient</label>
-    <input type="text" id="search" placeholder="e.g. vegetarian, chicken, lunch" />
+    <div class="settings-row">
+      <div><input type="text" id="search" placeholder="e.g. vegetarian, chicken, lunch" /></div>
+      <button id="search-btn">Search</button>
+    </div>
+    <div id="search-results"></div>
   </div>
 
   <div class="card">
@@ -423,7 +440,7 @@
       if (entry) {
         const over = entry.total_calories >= settings.daily_limit;
         flag = over ? "⚠️" : "✅";
-        kcalText = entry.total_calories + " kcal";
+        kcalText = String(entry.total_calories);
       }
 
       cell.innerHTML = `
@@ -649,6 +666,65 @@
   document.getElementById("next").addEventListener("click", () => {
     current.setMonth(current.getMonth() + 1);
     renderCalendar();
+  });
+
+  function runSearch() {
+    const resultsEl = document.getElementById("search-results");
+    if (!searchTerm) {
+      resultsEl.innerHTML = "";
+      return;
+    }
+
+    const hits = [];
+    Object.keys(log)
+      .sort()
+      .reverse()
+      .forEach((dateStr) => {
+        log[dateStr].meals.forEach((m) => {
+          const inTags = m.tags.some((t) => t.includes(searchTerm));
+          const inItems = m.items.some((it) => it.name.toLowerCase().includes(searchTerm));
+          const inRaw = (m.raw_input || "").toLowerCase().includes(searchTerm);
+          if (inTags || inItems || inRaw) hits.push({ dateStr, meal: m });
+        });
+      });
+
+    if (!hits.length) {
+      resultsEl.innerHTML = `<div class="search-empty">No meals match "${searchTerm}".</div>`;
+      return;
+    }
+
+    resultsEl.innerHTML = hits
+      .map((h) => {
+        const itemsText = h.meal.items.map((it) => it.name).join(", ");
+        const tagsText = h.meal.tags.length ? ` &middot; ${h.meal.tags.join(", ")}` : "";
+        return `<div class="search-hit" data-date="${h.dateStr}">
+          <div class="date">${h.dateStr} &middot; ${h.meal.total_calories} kcal</div>
+          <div class="snippet">${itemsText}${tagsText}</div>
+        </div>`;
+      })
+      .join("");
+  }
+
+  document.getElementById("search-results").addEventListener("click", (e) => {
+    const hit = e.target.closest(".search-hit");
+    if (!hit) return;
+    const dateStr = hit.dataset.date;
+    const [y, mo] = dateStr.split("-").map(Number);
+    current = new Date(y, mo - 1, 1);
+    selectedDate = dateStr;
+    editingIndex = null;
+    renderCalendar();
+    renderDayDetail(dateStr);
+    dayDetail.scrollIntoView({ behavior: "smooth" });
+  });
+
+  document.getElementById("search-btn").addEventListener("click", runSearch);
+
+  document.getElementById("search").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      runSearch();
+    }
   });
 
   document.getElementById("search").addEventListener("input", (e) => {
