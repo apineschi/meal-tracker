@@ -1,1 +1,37 @@
-{}
+{
+  "2026-08-28": {
+    "meals": [
+      {
+        "time": "2026-08-28T13:17:12.089Z",
+        "raw_input": "1 tomato, 1 ball light mozarella cheese, 1 slice artisan bread, 10g olive oil, 12g balsamic vinegar",
+        "items": [
+          {
+            "calories": 22,
+            "name": "tomato"
+          },
+          {
+            "calories": 72,
+            "name": "light mozzarella cheese"
+          },
+          {
+            "calories": 89,
+            "name": "artisan bread"
+          },
+          {
+            "calories": 120,
+            "name": "olive oil"
+          },
+          {
+            "calories": 6,
+            "name": "balsamic vinegar"
+          }
+        ],
+        "tags": [
+          "lunch"
+        ],
+        "total_calories": 329
+      }
+    ],
+    "total_calories": 329
+  }
+}
