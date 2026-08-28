@@ -285,9 +285,53 @@
         ],
         "tags": [],
         "total_calories": 578
+      },
+      {
+        "time": "2026-08-28T15:39:39.461Z",
+        "raw_input": "5 eggs",
+        "from_photo": false,
+        "items": [
+          {
+            "name": "egg",
+            "quantity": "",
+            "calories": 115.2,
+            "unit_label": "large egg",
+            "unit_calories": 72.8
+          },
+          {
+            "name": "egg",
+            "quantity": "",
+            "calories": 115.2,
+            "unit_label": "large egg",
+            "unit_calories": 72.8
+          },
+          {
+            "name": "egg",
+            "quantity": "",
+            "calories": 115.2,
+            "unit_label": "large egg",
+            "unit_calories": 72.8
+          },
+          {
+            "name": "egg",
+            "quantity": "",
+            "calories": 115.2,
+            "unit_label": "large egg",
+            "unit_calories": 72.8
+          },
+          {
+            "name": "egg",
+            "quantity": "",
+            "calories": 115.2,
+            "unit_label": "large egg",
+            "unit_calories": 72.8
+          }
+        ],
+        "tags": [],
+        "total_calories": 576
       }
     ],
-    "total_calories": 5277
+    "total_calories": 5853
   },
   "2026-08-13": {
     "meals": [
