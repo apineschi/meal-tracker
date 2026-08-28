@@ -101,6 +101,23 @@
     text-align: left;
   }
   .usda-alt-buttons button:disabled { opacity: 0.5; }
+  .usda-alt-edit-row { display: flex; gap: 4px; }
+  .usda-alt-edit-row input {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .usda-alt-edit-row button {
+    flex-shrink: 0;
+    padding: 6px 10px;
+    font-size: 13px;
+    border: none;
+    border-radius: 8px;
+    background: var(--bubble-user);
+    color: white;
+  }
   #chat-form {
     display: flex;
     flex-direction: column;
@@ -376,10 +393,10 @@
 
   function renderUsdaAlternatives(items, date, mealIndex, tags, totalToday, mealTotal, limit) {
     if (!Array.isArray(items) || mealIndex == null) return;
-    const ambiguous = items
+    const grounded = items
       .map((it, idx) => ({ it, idx }))
-      .filter(({ it }) => Array.isArray(it.usda_alternatives) && it.usda_alternatives.length);
-    if (!ambiguous.length) return;
+      .filter(({ it }) => it.usda_source);
+    if (!grounded.length) return;
 
     const currentItems = items.map((it) => ({ ...it }));
     const baseTotalToday = totalToday - mealTotal;
@@ -387,64 +404,118 @@
     const bubble = document.createElement("div");
     bubble.className = "bubble bot";
 
-    ambiguous.forEach(({ it, idx }) => {
+    grounded.forEach(({ it, idx }) => {
       const block = document.createElement("div");
       block.className = "usda-alt-block";
 
       const label = document.createElement("div");
       label.className = "usda-alt-label";
-      label.textContent = `Not sure about "${it.name}"? Using: ${it.usda_food} (${it.calories} kcal)`;
+      label.textContent = `"${it.name}": using ${it.usda_food} (${it.calories} kcal). Not right?`;
       block.appendChild(label);
 
       const btnRow = document.createElement("div");
       btnRow.className = "usda-alt-buttons";
 
-      it.usda_alternatives.forEach((alt) => {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.textContent = `${alt.description} — ${alt.calories} kcal`;
-        btn.addEventListener("click", async () => {
-          btnRow.querySelectorAll("button").forEach((b) => (b.disabled = true));
-          try {
-            currentItems[idx] = {
-              ...currentItems[idx],
-              calories: alt.calories,
-              unit_calories: alt.unit_calories,
-              usda_food: alt.description,
-              usda_kcal_per_100g: alt.kcal_per_100g,
-              usda_url: alt.url,
-              usda_source: true,
-            };
-            const secret = await ensureAppSecret();
-            const res = await fetch(WORKER_URL + "/edit-meal", {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "X-App-Secret": secret },
-              body: JSON.stringify({
-                date,
-                index: mealIndex,
-                items: currentItems,
-                tags: (tags || []).join(", "),
-              }),
-            });
-            if (res.status === 401) {
-              localStorage.removeItem("meal-tracker-secret");
-              throw new Error("Wrong password, try again.");
-            }
-            const result = await res.json();
-            if (!res.ok) throw new Error(result.error || "Failed to update");
-
-            label.textContent = `Updated "${it.name}" to: ${alt.description} (${alt.calories} kcal)`;
-            btnRow.remove();
-            const newMealTotal = currentItems.reduce((sum, i) => sum + i.calories, 0);
-            const newTotalToday = baseTotalToday + newMealTotal;
-            updateStatus(newTotalToday, limit, newTotalToday >= limit);
-          } catch (err) {
-            addBubble("Error: " + err.message, "error");
-            btnRow.querySelectorAll("button").forEach((b) => (b.disabled = false));
+      async function applyUpdate(newFields) {
+        btnRow.querySelectorAll("button, input").forEach((el) => (el.disabled = true));
+        try {
+          currentItems[idx] = { ...currentItems[idx], ...newFields };
+          const secret = await ensureAppSecret();
+          const res = await fetch(WORKER_URL + "/edit-meal", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-App-Secret": secret },
+            body: JSON.stringify({
+              date,
+              index: mealIndex,
+              items: currentItems,
+              tags: (tags || []).join(", "),
+            }),
+          });
+          if (res.status === 401) {
+            localStorage.removeItem("meal-tracker-secret");
+            throw new Error("Wrong password, try again.");
           }
-        });
-        btnRow.appendChild(btn);
+          const result = await res.json();
+          if (!res.ok) throw new Error(result.error || "Failed to update");
+
+          label.textContent = `"${it.name}" updated to ${currentItems[idx].calories} kcal.`;
+          btnRow.remove();
+          const newMealTotal = currentItems.reduce((sum, i) => sum + i.calories, 0);
+          const newTotalToday = baseTotalToday + newMealTotal;
+          updateStatus(newTotalToday, limit, newTotalToday >= limit);
+        } catch (err) {
+          addBubble("Error: " + err.message, "error");
+          btnRow.querySelectorAll("button, input").forEach((el) => (el.disabled = false));
+        }
+      }
+
+      const acceptBtn = document.createElement("button");
+      acceptBtn.type = "button";
+      acceptBtn.textContent = "✓ Looks right";
+      acceptBtn.addEventListener("click", () => {
+        label.textContent = `"${it.name}": ${it.calories} kcal (confirmed).`;
+        btnRow.remove();
       });
+      btnRow.appendChild(acceptBtn);
+
+      if (it.model_estimate) {
+        const rejectBtn = document.createElement("button");
+        rejectBtn.type = "button";
+        rejectBtn.textContent = `Reject USDA — use model estimate (${it.model_estimate.calories} kcal)`;
+        rejectBtn.addEventListener("click", () =>
+          applyUpdate({
+            calories: it.model_estimate.calories,
+            unit_calories: it.model_estimate.unit_calories,
+            unit_label: it.model_estimate.unit_label,
+            usda_source: false,
+          })
+        );
+        btnRow.appendChild(rejectBtn);
+      }
+
+      (it.usda_alternatives || []).forEach((alt) => {
+        const altBtn = document.createElement("button");
+        altBtn.type = "button";
+        altBtn.textContent = `${alt.description} — ${alt.calories} kcal`;
+        altBtn.addEventListener("click", () =>
+          applyUpdate({
+            calories: alt.calories,
+            unit_calories: alt.unit_calories,
+            usda_food: alt.description,
+            usda_kcal_per_100g: alt.kcal_per_100g,
+            usda_url: alt.url,
+            usda_source: true,
+          })
+        );
+        btnRow.appendChild(altBtn);
+      });
+
+      const editRow = document.createElement("div");
+      editRow.className = "usda-alt-edit-row";
+      const editInput = document.createElement("input");
+      editInput.type = "number";
+      editInput.placeholder = "Enter calories";
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.textContent = "Set";
+      editBtn.addEventListener("click", () => {
+        const val = Number(editInput.value);
+        if (!val || val <= 0) {
+          alert("Enter a valid number.");
+          return;
+        }
+        const countMatch = String(it.quantity || "").trim().match(/^([\d.]+)$/);
+        const count = countMatch ? parseFloat(countMatch[1]) : null;
+        const total = Math.round(val);
+        applyUpdate({
+          calories: total,
+          unit_calories: count ? Math.round(total / count) : total,
+          usda_source: false,
+        });
+      });
+      editRow.appendChild(editInput);
+      editRow.appendChild(editBtn);
+      btnRow.appendChild(editRow);
 
       block.appendChild(btnRow);
       bubble.appendChild(block);

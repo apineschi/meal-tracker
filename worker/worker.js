@@ -51,6 +51,13 @@ const CALORIE_SYSTEM_PROMPT =
   "If the same food appears multiple times or in a count (e.g. '5 eggs', '3 cookies'), " +
   "report it as ONE item with that count in 'quantity' and 'calories' equal to the total for " +
   "all of them combined - never repeat the same food as separate item entries.\n\n" +
+  "If the message itself already states a calorie value for an item (e.g. pasted from a " +
+  "nutrition label, recipe site, or food diary export - '165 cal', '165 kcal', '165 calories' " +
+  "next to or near the food name), use that stated number directly as 'calories' rather than " +
+  "estimating it yourself, and set 'explicit_calories' to true for that item. Only set it to " +
+  "true when a real number was actually present in the message - never for your own estimates. " +
+  "For an item with an explicit total, still derive 'unit_calories' by dividing that stated " +
+  "total the normal way (by the count in 'quantity') rather than estimating that too.\n\n" +
   "Fractions and portions apply ONLY to the specific item they're stated next to, never to " +
   "the whole message. '1/3 of 200g blueberries, one empanada' means: blueberries effective " +
   "quantity is about 67g (1/3 of 200g) - estimate calories for that reduced amount only - " +
@@ -96,9 +103,11 @@ const PHOTO_SYSTEM_PROMPT =
   "article, e.g. 'taco', '100g') and 'unit_calories' (that unit's calories) - if the item is " +
   "already a single natural unit, unit_calories should just equal calories. Also report " +
   "'estimated_gram_weight': your best real-world estimate of the total weight in grams of the " +
-  "quantity actually stated (e.g. '3 tacos' - about 300g total). 'reply' should be a short, " +
-  "friendly one-to-two sentence confirmation - do not mention the daily total, that is " +
-  "appended separately.";
+  "quantity actually stated (e.g. '3 tacos' - about 300g total). If a nutrition label or menu " +
+  "already states a calorie value (a printed number, not your own estimate), use it directly " +
+  "as 'calories' and set 'explicit_calories' to true for that item; otherwise set it to false. " +
+  "'reply' should be a short, friendly one-to-two sentence confirmation - do not mention the " +
+  "daily total, that is appended separately.";
 
 // Enforced via response_format below (Workers AI "JSON Mode") rather than
 // hoping the model follows a text instruction - much more reliable, though
@@ -117,8 +126,16 @@ const MEAL_JSON_SCHEMA = {
           unit_label: { type: "string" },
           unit_calories: { type: "number" },
           estimated_gram_weight: { type: "number" },
+          explicit_calories: { type: "boolean" },
         },
-        required: ["name", "calories", "unit_label", "unit_calories", "estimated_gram_weight"],
+        required: [
+          "name",
+          "calories",
+          "unit_label",
+          "unit_calories",
+          "estimated_gram_weight",
+          "explicit_calories",
+        ],
       },
     },
     total_calories: { type: "number" },
@@ -235,6 +252,7 @@ function extractMealJson(result, errorHint) {
       unit_label: it.unit_label || it.quantity || it.name || "item",
       unit_calories: typeof it.unit_calories === "number" ? it.unit_calories : calories,
       estimated_gram_weight: typeof it.estimated_gram_weight === "number" ? it.estimated_gram_weight : null,
+      explicit_calories: Boolean(it.explicit_calories),
     };
   });
 
@@ -402,8 +420,19 @@ function parseCount(quantity) {
 async function callWorkersAI(env, message) {
   const firstPass = await runCalorieModel(env, CALORIE_SYSTEM_PROMPT, message);
 
+  // Kept so a grounded item can later be reverted to "what the model itself
+  // thought, with no USDA fact in view at all" - a genuinely ungrounded
+  // estimate, not just the grounded pass's pre-override number.
+  const firstPassByName = new Map();
+  for (const item of firstPass.items) {
+    firstPassByName.set(item.name.toLowerCase(), item);
+  }
+
   const factsByName = new Map();
   for (const item of firstPass.items) {
+    // A value already stated in the user's own message is authoritative -
+    // don't spend a lookup checking it against USDA at all.
+    if (item.explicit_calories) continue;
     const food = await lookupUsdaFood(env, item.name);
     if (food) factsByName.set(item.name.toLowerCase(), food);
   }
@@ -449,6 +478,11 @@ async function callWorkersAI(env, message) {
   // are decent at) instead, and the actual scaling arithmetic happens here
   // in code, not inside the model's structured output.
   final.items = final.items.map((it) => {
+    // A value the user's own message already stated (pasted from a label,
+    // recipe, or diary export) is authoritative - never second-guess it
+    // with a USDA lookup, however well-matched.
+    if (it.explicit_calories) return it;
+
     const food = factsByName.get(it.name.toLowerCase());
     if (!food) return it;
 
@@ -484,12 +518,22 @@ async function callWorkersAI(env, message) {
       };
     });
 
+    const firstPassItem = firstPassByName.get(it.name.toLowerCase());
+    const modelEstimate = firstPassItem
+      ? {
+          calories: Math.round(firstPassItem.calories),
+          unit_calories: Math.round(firstPassItem.unit_calories),
+          unit_label: firstPassItem.unit_label,
+        }
+      : null;
+
     return {
       ...withSource,
       calories: total,
       unit_calories: unitCalories,
       unit_label: unitLabel,
       usda_alternatives: usdaAlternatives.length ? usdaAlternatives : undefined,
+      model_estimate: modelEstimate,
     };
   });
 

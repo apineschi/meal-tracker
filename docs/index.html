@@ -155,6 +155,23 @@
     text-align: left;
   }
   .usda-alt-buttons button:disabled { opacity: 0.5; }
+  .usda-alt-edit-row { display: flex; gap: 4px; }
+  .usda-alt-edit-row input {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .usda-alt-edit-row button {
+    flex-shrink: 0;
+    padding: 6px 10px;
+    font-size: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--accent);
+    color: white;
+  }
   .meal:first-child { border-top: none; }
   .meal .items { color: var(--muted); margin-top: 2px; }
   .meal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
@@ -648,14 +665,20 @@
       : "";
     const altsHtml = m.items
       .map((it, itemIdx) => {
-        if (!Array.isArray(it.usda_alternatives) || !it.usda_alternatives.length) return "";
-        const label = `Not sure about "${escapeHtml(it.name)}"? Using: ${escapeHtml(it.usda_food)} (${it.calories} kcal)`;
-        const buttons = it.usda_alternatives
+        if (!it.usda_source) return "";
+        const label = `"${escapeHtml(it.name)}": using ${escapeHtml(it.usda_food)} (${it.calories} kcal). Not right?`;
+        const idxAttrs = `data-meal-index="${i}" data-item-index="${itemIdx}"`;
+        let buttons = `<button type="button" data-action="accept-usda" ${idxAttrs}>&check; Looks right</button>`;
+        if (it.model_estimate) {
+          buttons += `<button type="button" data-action="use-model-estimate" ${idxAttrs}>Reject USDA — use model estimate (${it.model_estimate.calories} kcal)</button>`;
+        }
+        buttons += (it.usda_alternatives || [])
           .map(
             (alt, altIdx) =>
-              `<button type="button" data-action="use-alt" data-meal-index="${i}" data-item-index="${itemIdx}" data-alt-index="${altIdx}">${escapeHtml(alt.description)} — ${alt.calories} kcal</button>`
+              `<button type="button" data-action="use-alt" ${idxAttrs} data-alt-index="${altIdx}">${escapeHtml(alt.description)} — ${alt.calories} kcal</button>`
           )
           .join("");
+        buttons += `<div class="usda-alt-edit-row"><input type="number" placeholder="Enter calories" data-role="manual-calories" /><button type="button" data-action="use-manual" ${idxAttrs}>Set</button></div>`;
         return `<div class="usda-alt-block"><div class="usda-alt-label">${label}</div><div class="usda-alt-buttons">${buttons}</div></div>`;
       })
       .join("");
@@ -842,18 +865,22 @@
       } catch (err) {
         alert("Error: " + err.message);
       }
-    } else if (btn.dataset.action === "use-alt") {
+    } else if (btn.dataset.action === "accept-usda") {
+      btn.closest(".usda-alt-block").remove();
+    } else if (
+      btn.dataset.action === "use-alt" ||
+      btn.dataset.action === "use-model-estimate" ||
+      btn.dataset.action === "use-manual"
+    ) {
       const mealIndex = Number(btn.dataset.mealIndex);
       const itemIndex = Number(btn.dataset.itemIndex);
-      const altIndex = Number(btn.dataset.altIndex);
       const meal = log[dateStr].meals[mealIndex];
       const item = meal.items[itemIndex];
-      const alt = item.usda_alternatives[altIndex];
 
-      btn.closest(".usda-alt-buttons").querySelectorAll("button").forEach((b) => (b.disabled = true));
-      try {
-        meal.items[itemIndex] = {
-          ...item,
+      let newFields;
+      if (btn.dataset.action === "use-alt") {
+        const alt = item.usda_alternatives[Number(btn.dataset.altIndex)];
+        newFields = {
           calories: alt.calories,
           unit_calories: alt.unit_calories,
           usda_food: alt.description,
@@ -861,6 +888,30 @@
           usda_url: alt.url,
           usda_source: true,
         };
+      } else if (btn.dataset.action === "use-model-estimate") {
+        newFields = {
+          calories: item.model_estimate.calories,
+          unit_calories: item.model_estimate.unit_calories,
+          unit_label: item.model_estimate.unit_label,
+          usda_source: false,
+        };
+      } else {
+        const input = btn.closest(".usda-alt-edit-row").querySelector('[data-role="manual-calories"]');
+        const val = Number(input.value);
+        if (!val || val <= 0) {
+          alert("Enter a valid number.");
+          return;
+        }
+        const countMatch = String(item.quantity || "").trim().match(/^([\d.]+)$/);
+        const count = countMatch ? parseFloat(countMatch[1]) : null;
+        const total = Math.round(val);
+        newFields = { calories: total, unit_calories: count ? Math.round(total / count) : total, usda_source: false };
+      }
+
+      const block = btn.closest(".usda-alt-block");
+      block.querySelectorAll("button, input").forEach((el) => (el.disabled = true));
+      try {
+        meal.items[itemIndex] = { ...item, ...newFields };
         meal.total_calories = meal.items.reduce((sum, it) => sum + it.calories, 0);
 
         const secret = await ensureAppSecret();
@@ -881,7 +932,7 @@
         renderDayDetail(dateStr);
       } catch (err) {
         alert("Error: " + err.message);
-        btn.closest(".usda-alt-buttons").querySelectorAll("button").forEach((b) => (b.disabled = false));
+        block.querySelectorAll("button, input").forEach((el) => (el.disabled = false));
       }
     }
   });

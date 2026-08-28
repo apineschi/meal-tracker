@@ -13,15 +13,16 @@ app has to respond to you in real time when you log a meal. GitHub Actions
 has no "respond to an HTTP request in under a second" mode; Cloudflare
 Workers' free tier (100k requests/day, no card required) does.
 
-Calorie parsing runs on **Cloudflare Workers AI** (an open-source model, bound
+Calorie parsing runs on **Cloudflare Workers AI** (open-source models, bound
 directly into the Worker), not the Anthropic API — Anthropic has no free API
 tier, and per-request billing would violate the "$0" requirement. Workers AI's
 free daily allowance requires no card and, on Cloudflare's free Workers plan,
 requests past that allowance simply fail rather than billing you — there's no
 way to accidentally incur a charge. The trade-off is estimate quality: an open
-8B model's calorie guesses are a real notch below Claude's, closer to "rough
-ballpark" than "look this up carefully." See "Calorie estimation" below for
-the actual prompt.
+model's calorie guesses are a real notch below Claude's, closer to "rough
+ballpark" than "look this up carefully" — USDA grounding (below) exists
+specifically to close that gap for real ingredients. See "Calorie estimation"
+below for the actual prompts.
 
 The Worker is the only thing that ever holds secrets (a GitHub token, your
 ntfy topic, your app password). Nothing secret ever touches `docs/`, because
@@ -32,22 +33,41 @@ everyone the code, same as job-scraper's dashboard.
 
 ```mermaid
 flowchart TD
-    A["chat.html\n(added to phone home screen)"] -->|"POST /chat\n+ X-App-Secret header"| B["Cloudflare Worker"]
-    B --> C["Workers AI (env.AI binding)\nfree open model, JSON reply:\nitems, calories, tags, reply"]
+    A["chat.html\n(added to phone home screen)\ntext and/or photo"] -->|"POST /chat\n+ X-App-Secret header"| B["Cloudflare Worker"]
+    B --> C1["Workers AI text/vision model\nfirst-pass parse: items,\nquantities, estimated_gram_weight"]
+    C1 -->|"if USDA_API_KEY set"| C2["USDA FoodData Central lookup\nper item, Foundation → SR Legacy → all"]
+    C2 -->|"real kcal/100g found"| C3["Grounded second-pass model call\n+ calorie math done in code\n(not trusted to the model)"]
+    C2 -->|"no plausible match"| C4["Keep first-pass estimate"]
+    C1 -.->|"USDA_API_KEY unset"| C4
+    C3 --> E
+    C4 --> E
     B --> D["GitHub Contents API\nread docs/log.json + docs/settings.json"]
-    C --> E["Append meal to today's entry,\nrecompute daily total"]
+    E["Append meal to today's entry,\nrecompute daily total"]
     D --> E
     E --> F["GitHub Contents API\nPUT docs/log.json\n(commit as meal-tracker-bot)"]
     E -->|"if total >= daily_limit"| G["ntfy.sh push notification"]
     F --> H["GitHub Pages\ndocs/index.html + docs/log.json"]
     H --> I["Calendar dashboard\n(browser, reads JSON directly)"]
-    B -->|"reply + running total"| A
+    B -->|"reply + breakdown + running total"| A
 ```
 
 `index.html` (the calendar) and `chat.html` (the logging UI) both read
 `log.json`/`settings.json` directly as static files — no Worker call needed
 just to display data. The Worker is only invoked to *write* (`/chat`,
 `/settings`).
+
+## Worker endpoints
+
+All five live in `worker.js`'s `ROUTES` map, POST-only, all requiring the
+`X-App-Secret` header:
+
+| Route | Does |
+|---|---|
+| `/chat` | Parses a text message and/or photo into a meal, logs it, returns the breakdown. The main entry point — also what "add a meal to this day" and backfilling a past date reuse, just with a different `localDate`. |
+| `/settings` | Updates `daily_limit`. |
+| `/edit-meal` | Overwrites one meal's `items`/`tags` by `{date, index}`, recomputing totals. Also how picking a USDA alternative gets persisted (see below). |
+| `/delete-meal` | Removes one meal by `{date, index}`, recomputing totals. |
+| `/estimate-item` | Recalculates a single item from a free-text description (the edit UI's ↻ button) — one model call, no logging side effects. |
 
 ## Repo layout
 
@@ -78,13 +98,17 @@ CORS (`Access-Control-Allow-Origin`) only stops *browsers* from letting other
 websites' JavaScript call your Worker — it does nothing against someone
 calling the Worker URL directly (curl, a script, etc.), and the URL itself is
 sitting in plain view in `chat.html`'s source once the repo is public. Without
-a check, anyone who found that URL could rack up charges against your
-Anthropic key or write garbage into your log. `APP_SECRET` is a password only
-you know; the front end asks for it once, stores it in `localStorage`, and
-sends it as `X-App-Secret` on every write. This is not bulletproof (anyone who
-gets your phone unlocked and opens dev tools could read it out of
-localStorage) but it stops the realistic threat, which is a stranger finding
-the public URL.
+a check, anyone who found that URL could write garbage into your log or (if
+`USDA_API_KEY` is set) burn through its request quota. `APP_SECRET` is a
+password only you know; the front end asks for it once via a real password
+input (autocapitalize/autocorrect/spellcheck all explicitly disabled — a
+plain `prompt()` was tried first and mobile keyboard auto-capitalization
+silently corrupted what got typed, causing "wrong password" failures that
+had nothing to do with the actual password), stores it in `localStorage`,
+and sends it as `X-App-Secret` on every write. This is not bulletproof
+(anyone who gets your phone unlocked and opens dev tools could read it out
+of localStorage) but it stops the realistic threat, which is a stranger
+finding the public URL.
 
 ## Data model
 
@@ -96,19 +120,38 @@ the public URL.
     "meals": [
       {
         "time": "2026-08-28T08:15:00.000Z",
-        "raw_input": "2 eggs, 1 slice toast with butter, tags: breakfast vegetarian",
+        "raw_input": "5 eggs",
+        "from_photo": false,
         "items": [
-          { "name": "egg", "quantity": "2", "calories": 140 },
-          { "name": "toast with butter", "quantity": "1 slice", "calories": 120 }
+          {
+            "name": "egg",
+            "quantity": "5",
+            "calories": 370,
+            "unit_label": "egg",
+            "unit_calories": 74,
+            "estimated_gram_weight": 250,
+            "usda_source": true,
+            "usda_food": "Egg, whole, raw, fresh",
+            "usda_kcal_per_100g": 148,
+            "usda_url": "https://fdc.nal.usda.gov/food-details/.../nutrients",
+            "usda_alternatives": []
+          }
         ],
         "tags": ["breakfast", "vegetarian"],
-        "total_calories": 260
+        "total_calories": 370
       }
     ],
-    "total_calories": 260
+    "total_calories": 370
   }
 }
 ```
+
+Everything from `unit_label` onward is optional/best-effort per item —
+`usda_*` fields only appear when grounding found and used a match (see "USDA
+grounding" below); `usda_alternatives` only has entries when other plausible
+matches existed with a meaningfully different calorie value. Older entries
+logged before a given field existed simply don't have it, and every renderer
+treats these fields as optional rather than assuming their presence.
 
 `docs/settings.json`: `{ "daily_limit": 2000 }`.
 
@@ -150,6 +193,36 @@ it has no internet access and no built-in nutrition database, so left alone
 it's recalling patterns from training data, not looking anything up. That's
 what "USDA grounding" (below) exists to fix for the text flow.
 
+The system prompts explicitly tell the model to consolidate a repeated food
+into one item with a count in `quantity`, not list it as separate identical
+entries ("5 eggs" is one item, not five "egg" entries) — but a "fast" free
+model doesn't always comply, so `extractMealJson()` also merges any
+duplicate item names into one combined entry (summing calories) as a
+code-level safety net regardless of whether the model followed instructions.
+
+Both model calls (`runCalorieModel()`, `callWorkersAIVision()`) set an
+explicit `max_tokens: 3000` — the item schema is seven fields deep now
+(`name`, `quantity`, `calories`, `unit_label`, `unit_calories`,
+`estimated_gram_weight`, `explicit_calories`), so a multi-item meal produces
+enough JSON that an unbounded/low default output length can truncate the
+response mid-object and fail to parse entirely.
+
+If the message itself already states a calorie value (pasted from a
+nutrition label, recipe site, or food diary export — "grilled chicken -
+165 cal"), the model sets that item's `explicit_calories: true` and uses the
+stated number directly rather than estimating. `callWorkersAI()` treats this
+as authoritative: it skips the USDA lookup for that item entirely (no point
+spending a request checking a number that will never be overridden) and the
+grounding override step passes the item through untouched. A value you
+typed or pasted yourself always wins over anything the app would otherwise
+compute.
+
+Tags come from three sources that all just feed the same comma-separated
+`tags` field the Worker merges and dedupes: whatever the model infers from
+the message text, a free-text tags input, and two rows of quick-tag toggle
+buttons (Breakfast/Lunch/Dinner/Snack/Drink, and separately Meat/Vegetarian/
+Vegan) present on both `chat.html` and `index.html`'s "add a meal" box.
+
 ## USDA grounding (optional, improves accuracy)
 
 If `USDA_API_KEY` is set (free key from USDA's FoodData Central), `callWorkersAI()`
@@ -176,19 +249,30 @@ lookup — the visible USDA link and matched food name in the reply exist
 specifically so a future bad match is something the reader can catch by
 eye, not something hidden behind a confident-looking number.
 
-When multiple plausible matches would give meaningfully different answers
-(kcal/100g differing by more than 15%), `lookupUsdaFood()` keeps up to three
-as `alternatives` alongside the chosen best match, rather than silently
-picking one. `callWorkersAI()` recomputes each alternative's calories using
-the exact same gram basis as the chosen match, so switching is a straight
-swap. `handleChat()` returns the new meal's `date`/`meal_index` specifically
-so the front end can call `/edit-meal` again later to apply a chosen
-alternative without needing a fresh model call — the arithmetic was already
-done, only the item's stored fields change. Both `chat.html` (a picker
-rendered under the item breakdown) and `index.html` (a picker under each
-logged item) implement this the same way: mutate a local copy of that
-meal's `items`, POST the whole array to `/edit-meal`, then reflect the
-result.
+**Every grounded item is reviewable, not just ambiguous ones.** Both
+`chat.html` (under the item breakdown) and `index.html` (under each logged
+item) render a small picker for any item with `usda_source: true`, offering
+three actions: accept as-is (dismisses the picker, no server call), reject
+USDA and revert to `model_estimate` (the plain first-pass, pre-grounding
+number — see below), or type an exact calorie value directly. Picking
+anything besides "accept" mutates a local copy of that meal's `items` and
+POSTs the whole array to `/edit-meal` — `handleChat()` returns the new
+meal's `date`/`meal_index` specifically so this later call can target it
+without needing a fresh model call, since the arithmetic was already done.
+
+When multiple plausible USDA matches would give meaningfully different
+answers (kcal/100g differing by more than 15%), `lookupUsdaFood()` also
+keeps up to three as `alternatives` alongside the chosen best match, rather
+than silently picking one — these appear as extra buttons in the same
+picker. `callWorkersAI()` recomputes each alternative's calories using the
+exact same gram basis as the chosen match, so switching is a straight swap.
+
+"Reject USDA" specifically needs the model's *pre-grounding* estimate, not
+just its grounded-but-not-yet-overridden number (which was already computed
+with the USDA fact sitting in its context, not a clean second opinion) — so
+`callWorkersAI()` keeps a `firstPassByName` map from the initial ungrounded
+pass purely so an item can be reverted to what the model itself thought
+with no USDA fact in view at all.
 
 **The actual calorie arithmetic happens in code, not inside the model.**
 Earlier versions asked the model to convert "kcal per 100g" to the real
@@ -239,6 +323,29 @@ instead of today's — useful for backfilling a forgotten meal on a past date.
 All three of these update the in-memory `log` object directly from the
 Worker's response rather than re-fetching `docs/log.json`, since GitHub
 Pages' CDN can lag a few seconds to minutes behind a fresh commit.
+
+## Calendar dashboard (`index.html`)
+
+Each day cell's whole background is color-coded from `log.json` and
+`settings.json` alone (green = under `daily_limit`, red = over, grey = no
+meals that day) — no emoji, since an earlier emoji-flag design clipped
+inside the small cell width on mobile.
+
+Search (the box below the day-detail view) doesn't just highlight matching
+days on the currently-viewed month — it renders an actual results list
+(date, calories, matching ingredients/tags) across the entire log, since
+highlighting alone gave no feedback for a match sitting in a different
+month. It matches against item names, tags, and the original typed message
+(`raw_input`), not just tags. Clicking a result jumps the calendar to that
+month and opens that day.
+
+## `chat.html` persistence
+
+Two independent things persist in `localStorage`, both per-device only (no
+sync between your phone and desktop browser if you use both): the app
+password (see "Why the Worker needs `APP_SECRET`" above), and the visible
+chat transcript itself (capped at the last 200 messages) — so reopening the
+page after closing it doesn't drop back to a blank conversation.
 
 ## Known limitations (MVP)
 
