@@ -110,35 +110,8 @@
     "total_calories": 1102
   },
   "2026-08-13": {
-    "meals": [
-      {
-        "time": "2026-08-28T14:02:34.033Z",
-        "raw_input": "Half a stick of butter, 6 eggs, a chocolate chip cookie from caffe nero",
-        "from_photo": false,
-        "items": [
-          {
-            "name": "half a stick of butter",
-            "quantity": "",
-            "calories": 36
-          },
-          {
-            "name": "6 eggs",
-            "quantity": "5",
-            "calories": 360
-          },
-          {
-            "name": "a chocolate chip cookie from caffe nero",
-            "quantity": "",
-            "calories": 120
-          }
-        ],
-        "tags": [
-          "snack"
-        ],
-        "total_calories": 516
-      }
-    ],
-    "total_calories": 516
+    "meals": [],
+    "total_calories": 0
   },
   "2026-08-18": {
     "meals": [],
