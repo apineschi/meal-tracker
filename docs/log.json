@@ -6,32 +6,37 @@
         "raw_input": "1 tomato, 1 ball light mozarella cheese, 1 slice artisan bread, 10g olive oil, 12g balsamic vinegar",
         "items": [
           {
-            "calories": 22,
-            "name": "tomato"
+            "name": "tomato",
+            "quantity": "",
+            "calories": 22
           },
           {
-            "calories": 72,
-            "name": "light mozzarella cheese"
+            "name": "light mozzarella cheese",
+            "quantity": "120g",
+            "calories": 200
           },
           {
-            "calories": 89,
-            "name": "artisan bread"
+            "name": "artisan bread",
+            "quantity": "",
+            "calories": 89
           },
           {
-            "calories": 120,
-            "name": "olive oil"
+            "name": "olive oil",
+            "quantity": "",
+            "calories": 120
           },
           {
-            "calories": 6,
-            "name": "balsamic vinegar"
+            "name": "balsamic vinegar",
+            "quantity": "",
+            "calories": 6
           }
         ],
         "tags": [
           "lunch"
         ],
-        "total_calories": 329
+        "total_calories": 437
       }
     ],
-    "total_calories": 329
+    "total_calories": 437
   }
 }
