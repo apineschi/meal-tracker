@@ -444,9 +444,27 @@
         ],
         "tags": [],
         "total_calories": 943
+      },
+      {
+        "time": "2026-08-28T17:13:04.302Z",
+        "raw_input": "1 beef empenada",
+        "from_photo": false,
+        "items": [
+          {
+            "name": "beef empenada",
+            "quantity": "1",
+            "calories": 320,
+            "unit_label": "empenada",
+            "unit_calories": 320,
+            "estimated_gram_weight": 120,
+            "explicit_calories": false
+          }
+        ],
+        "tags": [],
+        "total_calories": 320
       }
     ],
-    "total_calories": 8506
+    "total_calories": 8826
   },
   "2026-08-13": {
     "meals": [
