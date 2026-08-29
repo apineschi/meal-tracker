@@ -183,12 +183,12 @@
           {
             "name": "prosciutto",
             "quantity": "3 slices",
-            "calories": 429,
-            "unit_label": "100g",
-            "unit_calories": 429,
+            "calories": 135,
+            "unit_label": "slice",
+            "unit_calories": 45,
             "estimated_gram_weight": 150,
             "explicit_calories": false,
-            "usda_source": true,
+            "usda_source": false,
             "usda_food": "PROSCIUTTO",
             "usda_kcal_per_100g": 286,
             "usda_url": "https://fdc.nal.usda.gov/food-details/2495531/nutrients",
@@ -294,9 +294,9 @@
           "lunch",
           "meat"
         ],
-        "total_calories": 1283
+        "total_calories": 989
       }
     ],
-    "total_calories": 1283
+    "total_calories": 989
   }
 }
