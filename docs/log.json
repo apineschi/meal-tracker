@@ -224,12 +224,12 @@
           {
             "name": "mozarella",
             "quantity": "0.5",
-            "calories": 203,
-            "unit_label": "100g",
-            "unit_calories": 406,
+            "calories": 100,
+            "unit_label": "ball",
+            "unit_calories": 200,
             "estimated_gram_weight": 75,
             "explicit_calories": false,
-            "usda_source": true,
+            "usda_source": false,
             "usda_food": "PEPPERONI AND MOZARELLA CHEESE PIZZA, PEPPERONI; MOZARELLA CHEESE",
             "usda_kcal_per_100g": 270,
             "usda_url": "https://fdc.nal.usda.gov/food-details/2568997/nutrients",
@@ -294,9 +294,9 @@
           "lunch",
           "meat"
         ],
-        "total_calories": 989
+        "total_calories": 886
       }
     ],
-    "total_calories": 989
+    "total_calories": 886
   }
 }
