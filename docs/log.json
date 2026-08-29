@@ -295,8 +295,38 @@
           "meat"
         ],
         "total_calories": 376
+      },
+      {
+        "time": "2026-08-29T17:52:09.920Z",
+        "raw_input": "Cesar salad, fridge raiders from sains 350 calories",
+        "from_photo": false,
+        "items": [
+          {
+            "name": "Cesar salad",
+            "quantity": "Not specified",
+            "calories": 350,
+            "unit_label": "Cesar salad",
+            "unit_calories": 350,
+            "estimated_gram_weight": 200,
+            "explicit_calories": true
+          },
+          {
+            "name": "fridge raiders",
+            "quantity": "Not specified",
+            "calories": 120,
+            "unit_label": "packet",
+            "unit_calories": 120,
+            "estimated_gram_weight": 30,
+            "explicit_calories": false
+          }
+        ],
+        "tags": [
+          "lunch",
+          "meat"
+        ],
+        "total_calories": 470
       }
     ],
-    "total_calories": 376
+    "total_calories": 846
   }
 }
