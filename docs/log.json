@@ -265,12 +265,12 @@
           {
             "name": "toast",
             "quantity": "2 slices",
-            "calories": 630,
-            "unit_label": "100g",
-            "unit_calories": 630,
+            "calories": 120,
+            "unit_label": "slice",
+            "unit_calories": 60,
             "estimated_gram_weight": 200,
             "explicit_calories": false,
-            "usda_source": true,
+            "usda_source": false,
             "usda_food": "Bread, egg, toasted",
             "usda_kcal_per_100g": 315,
             "usda_url": "https://fdc.nal.usda.gov/food-details/172674/nutrients",
@@ -294,9 +294,9 @@
           "lunch",
           "meat"
         ],
-        "total_calories": 886
+        "total_calories": 376
       }
     ],
-    "total_calories": 886
+    "total_calories": 376
   }
 }
