@@ -396,12 +396,12 @@
           {
             "name": "oat milk",
             "quantity": "150ml",
-            "calories": 68,
+            "calories": 75,
             "unit_label": "100g",
-            "unit_calories": 68,
+            "unit_calories": 75,
             "estimated_gram_weight": 150,
             "explicit_calories": false,
-            "usda_source": true,
+            "usda_source": false,
             "usda_food": "Oat milk",
             "usda_kcal_per_100g": 45,
             "usda_url": "https://fdc.nal.usda.gov/food-details/2705412/nutrients",
@@ -442,9 +442,9 @@
         "tags": [
           "drink"
         ],
-        "total_calories": 71
+        "total_calories": 78
       }
     ],
-    "total_calories": 1147
+    "total_calories": 1154
   }
 }
