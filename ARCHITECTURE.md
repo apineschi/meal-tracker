@@ -155,6 +155,24 @@ treats these fields as optional rather than assuming their presence.
 
 `docs/settings.json`: `{ "daily_limit": 2000 }`.
 
+## Design principle: the model estimates, code computes
+
+This shows up in three separate places below (unit conversion, USDA volume
+handling, and implicitly in how grounding is applied), so it's worth
+stating once as a rule rather than three times as a bug story: **ask the
+model for facts and judgment calls it's actually good at — a plausible
+real-world weight, a food's identity, whether a value was explicitly
+stated — and do every downstream arithmetic step in plain code, never
+inside the model's own structured output.** Every time this project asked
+the model to *combine* two numbers itself (converting "kcal per 100g" to a
+real quantity, scaling a total across a count), it got it wrong in a
+specific, repeatable way — not randomly, but systematically (treating "100g"
+as if it were one whole unit regardless of the food's real size). Asking it
+for one estimate at a time and doing the multiplication in `worker.js`
+instead has held up so far. Keep this in mind before adding any new feature
+that needs the model to produce more than one number that has to agree with
+another.
+
 ## Calorie estimation
 
 The Worker calls Workers AI's **JSON Mode** (`response_format: { type:
@@ -287,8 +305,19 @@ post-processing step in `callWorkersAI()` then computes
 `calories = kcalPer100g × estimated_gram_weight ÷ 100` directly, and derives
 `unit_calories` by dividing that total by a count parsed from `quantity` when
 one exists. An explicit gram quantity in the message itself (e.g. "300g")
-is trusted over the model's estimate, since there's nothing to estimate in
-that case. The meal's `total_calories` is recomputed as the sum of all items
+is trusted over any estimate, since there's nothing to estimate in that
+case. For a volume-stated item (mL, L, cups, fl oz) with no explicit grams,
+the model's own `estimated_gram_weight` is preferred over a flat
+mL-to-grams conversion — the model can account for a specific liquid's real
+density (oil ~0.92g/mL, syrup ~1.4g/mL) where a fixed ratio can't, and since
+the actual arithmetic combining weight with the calorie fact happens in
+code either way, there's no arithmetic-reliability reason to distrust the
+model's weight estimate here the way there was for the "5 eggs" bug above.
+`parseMilliliters()`'s ~1g/mL conversion only kicks in as a fallback when
+the model doesn't provide a usable `estimated_gram_weight` at all — accurate
+for water-like liquids (milk, juice, broth, most beverages), meaningfully
+off for fattier ones, but strictly a backstop, not the primary path.
+The meal's `total_calories` is recomputed as the sum of all items
 afterward, so it always stays consistent with whatever got overridden.
 
 This is a pure accuracy improvement layered on top of the existing flow,
@@ -312,10 +341,22 @@ typed food name — left as model-only estimation for now.
 `{date, index}` — its position in that day's `meals` array — rather than a
 stored ID, since edits are simple read-modify-write cycles against the whole
 `log.json` file and there's only ever one user acting on it at a time. Both
-recompute that day's `total_calories` from scratch after the change. The
-calendar dashboard's edit form re-renders items as plain `name | quantity |
-calories` lines rather than a dynamic multi-field UI — less polished, but
-far less code, and fine for how rarely this gets used.
+recompute that day's `total_calories` from scratch after the change.
+`/delete-meal` deletes the date's key entirely once its `meals` array is
+empty, rather than leaving `{meals: [], total_calories: 0}` behind — an
+earlier version left that empty object in place, and the calendar's "does
+this date have anything logged" check treated it as a real, 0-calorie,
+under-limit day (showing green) rather than "nothing logged" (grey).
+`renderCalendar()`/`renderDayDetail()` additionally treat any entry with an
+empty `meals` array as absent, so this class of bug self-heals for existing
+data without needing to hand-edit `log.json`.
+
+The calendar dashboard's edit form shows each item as one free-text
+description field (e.g. "300g blueberries") plus a calories field and a ↻
+button that calls `/estimate-item` to recalculate — simpler to use and less
+code than separate name/quantity inputs, at the cost of losing a structured
+`quantity` on edited items (it's stored as an empty string; the whole typed
+description just becomes `name`).
 
 `index.html`'s day-detail view also has an "Add a meal to this day" box,
 which is really just the same `/chat` endpoint called with that day's date
@@ -346,6 +387,23 @@ sync between your phone and desktop browser if you use both): the app
 password (see "Why the Worker needs `APP_SECRET`" above), and the visible
 chat transcript itself (capped at the last 200 messages) — so reopening the
 page after closing it doesn't drop back to a blank conversation.
+
+## App icon (`docs/icon.svg`)
+
+The first version rendered the 🍽️ character as SVG `<text>`, delegating
+entirely to whatever emoji font the viewing platform happens to have — this
+looked inconsistent and soft rather than crisp, since every platform's
+emoji font differs in style and the glyph's position within the text
+element isn't reliably centered. The current version instead embeds actual
+Twemoji vector artwork (three concentric circles for the plate, a
+tine-and-handle path for the fork, a blade-and-handle path for the knife —
+traced from `assets/svg/1f37d.svg` in twitter/twemoji) composited onto a
+custom teal gradient rounded-square background, the same general approach
+job-scraper's icon uses (real vector artwork on a branded background, not a
+live-rendered character). Twemoji is CC-BY 4.0, which requires attribution —
+the SVG file carries a comment crediting it; job-scraper's icon likely owes
+the same credit and doesn't currently have it, not something touched here
+since it's a different project.
 
 ## Known limitations (MVP)
 

@@ -290,9 +290,14 @@ function extractMealJson(result, errorHint) {
 }
 
 async function usdaSearchList(env, query, dataType) {
+  // The unrestricted (Branded-inclusive) fallback is where a specific
+  // packaged product - Oatly, a particular brand of oat milk, etc. - is most
+  // likely to actually live, so give it more candidates to check than the
+  // generic-food-only stages need.
+  const pageSize = dataType ? 5 : 10;
   let url =
     `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${env.USDA_API_KEY}` +
-    `&query=${encodeURIComponent(query)}&pageSize=5`;
+    `&query=${encodeURIComponent(query)}&pageSize=${pageSize}`;
   if (dataType) url += `&dataType=${encodeURIComponent(dataType)}`;
   const res = await fetch(url);
   if (!res.ok) return [];
@@ -412,6 +417,26 @@ function parseGrams(quantity) {
   return m ? parseFloat(m[1]) : null;
 }
 
+// Fallback only, used when the model doesn't give a usable
+// estimated_gram_weight for a volume-stated item: converts to grams
+// assuming ~1g/mL density. Accurate for water-like liquids (milk, juice,
+// broth, most beverages) but meaningfully off for fattier ones (oil
+// ~0.92g/mL, honey/syrup ~1.4g/mL) - the model's own estimate is preferred
+// precisely because it can account for a specific liquid's real density,
+// which this flat ratio can't.
+function parseMilliliters(quantity) {
+  const q = String(quantity || "").trim();
+  let m = q.match(/^([\d.]+)\s*m\.?l\.?$/i);
+  if (m) return parseFloat(m[1]);
+  m = q.match(/^([\d.]+)\s*l(iters?|itres?)?$/i);
+  if (m) return parseFloat(m[1]) * 1000;
+  m = q.match(/^([\d.]+)\s*(fl\.?\s?oz\.?|fluid\s?ounces?)$/i);
+  if (m) return parseFloat(m[1]) * 29.5735;
+  m = q.match(/^([\d.]+)\s*cups?$/i);
+  if (m) return parseFloat(m[1]) * 236.588;
+  return null;
+}
+
 function parseCount(quantity) {
   const m = String(quantity || "").trim().match(/^([\d.]+)$/);
   return m ? parseFloat(m[1]) : null;
@@ -494,10 +519,22 @@ async function callWorkersAI(env, message) {
       usda_url: food.fdcId ? `https://fdc.nal.usda.gov/food-details/${food.fdcId}/nutrients` : null,
     };
 
-    // An explicit gram quantity ("300g") is more trustworthy than the
-    // model's estimate, since there's nothing to estimate - use it first.
+    // An explicit gram quantity ("300g") is more trustworthy than any
+    // estimate, since there's nothing to estimate - use it first. After
+    // that, prefer the model's own estimated_gram_weight over a flat
+    // mL-to-grams conversion: the model can account for a liquid's actual
+    // density (oil ~0.92g/mL, syrup ~1.4g/mL) where a fixed water-like ratio
+    // can't, and the arithmetic that combines this weight with a calorie
+    // figure happens in code either way, so there's no arithmetic-reliability
+    // reason to prefer the hardcoded number here. The flat conversion is
+    // only a fallback for when the model doesn't give a usable estimate.
     const explicitGrams = parseGrams(it.quantity);
-    const grams = explicitGrams != null ? explicitGrams : it.estimated_gram_weight;
+    const modelGrams =
+      typeof it.estimated_gram_weight === "number" && it.estimated_gram_weight > 0
+        ? it.estimated_gram_weight
+        : null;
+    const mlFallback = explicitGrams == null && modelGrams == null ? parseMilliliters(it.quantity) : null;
+    const grams = explicitGrams != null ? explicitGrams : modelGrams != null ? modelGrams : mlFallback;
     if (typeof grams !== "number" || grams <= 0) return withSource;
 
     const total = Math.round((food.kcalPer100g * grams) / 100);
@@ -785,11 +822,23 @@ async function handleDeleteMeal(request, env, origin) {
   }
 
   log[date].meals.splice(index, 1);
-  log[date].total_calories = log[date].meals.reduce((sum, m) => sum + m.total_calories, 0);
+
+  // Remove the day entirely once it has no meals left, rather than leaving
+  // an empty {meals: [], total_calories: 0} behind - the calendar and search
+  // both treat "does this date have an entry at all" as "were there meals",
+  // and an empty-but-present entry reads as a real (0-calorie, under-limit)
+  // day instead of "nothing logged".
+  let dayTotal = 0;
+  if (log[date].meals.length === 0) {
+    delete log[date];
+  } else {
+    log[date].total_calories = log[date].meals.reduce((sum, m) => sum + m.total_calories, 0);
+    dayTotal = log[date].total_calories;
+  }
 
   await putJsonFile(env, "docs/log.json", log, sha, `Delete meal (${date} #${index})`);
 
-  return jsonResponse({ day_total: log[date].total_calories }, 200, origin);
+  return jsonResponse({ day_total: dayTotal }, 200, origin);
 }
 
 const ROUTES = {

@@ -579,7 +579,10 @@
     for (let day = 1; day <= daysInMonth; day++) {
       const dateObj = new Date(year, month, day);
       const dateStr = fmt(dateObj);
-      const entry = log[dateStr];
+      // Defensive against a stray {meals: [], total_calories: 0} entry (an
+      // older bug could leave one behind after deleting a day's only meal) -
+      // treat "no meals" as no entry at all, not as a 0-calorie logged day.
+      const entry = log[dateStr] && log[dateStr].meals && log[dateStr].meals.length ? log[dateStr] : null;
 
       const cell = document.createElement("div");
       cell.className = "day";
@@ -713,7 +716,7 @@
   }
 
   function renderDayDetail(dateStr) {
-    const entry = log[dateStr];
+    const entry = log[dateStr] && log[dateStr].meals && log[dateStr].meals.length ? log[dateStr] : null;
     if (!entry) {
       dayDetail.style.display = "block";
       document.getElementById("day-total").textContent = `${dateStr}: no meals logged`;
@@ -766,7 +769,11 @@
         if (!res.ok) throw new Error(data.error || "Failed to delete");
 
         log[dateStr].meals.splice(index, 1);
-        log[dateStr].total_calories = data.day_total;
+        if (log[dateStr].meals.length === 0) {
+          delete log[dateStr];
+        } else {
+          log[dateStr].total_calories = data.day_total;
+        }
         editingIndex = null;
         renderCalendar();
         renderDayDetail(dateStr);
