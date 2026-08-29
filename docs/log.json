@@ -443,8 +443,26 @@
           "drink"
         ],
         "total_calories": 78
+      },
+      {
+        "time": "2026-08-29T17:57:08.976Z",
+        "raw_input": "Rice crackers 40 calories",
+        "from_photo": false,
+        "items": [
+          {
+            "name": "Rice crackers",
+            "quantity": "One serving",
+            "calories": 40,
+            "unit_label": "one serving",
+            "unit_calories": 40,
+            "estimated_gram_weight": 20,
+            "explicit_calories": true
+          }
+        ],
+        "tags": [],
+        "total_calories": 40
       }
     ],
-    "total_calories": 1154
+    "total_calories": 1194
   }
 }
