@@ -154,5 +154,149 @@
   "2026-08-18": {
     "meals": [],
     "total_calories": 0
+  },
+  "2026-08-29": {
+    "meals": [
+      {
+        "time": "2026-08-29T13:36:39.972Z",
+        "raw_input": "Half a peach, 3 slices of prosciutto, half a ball of mozarella, 2 slices of toast",
+        "from_photo": false,
+        "items": [
+          {
+            "name": "peach",
+            "quantity": "0.5",
+            "calories": 21,
+            "unit_label": "100g",
+            "unit_calories": 42,
+            "estimated_gram_weight": 50,
+            "explicit_calories": false,
+            "usda_source": true,
+            "usda_food": "Peaches, yellow, raw",
+            "usda_kcal_per_100g": 42,
+            "usda_url": "https://fdc.nal.usda.gov/food-details/325430/nutrients",
+            "model_estimate": {
+              "calories": 60,
+              "unit_calories": 120,
+              "unit_label": "peach"
+            }
+          },
+          {
+            "name": "prosciutto",
+            "quantity": "3 slices",
+            "calories": 429,
+            "unit_label": "100g",
+            "unit_calories": 429,
+            "estimated_gram_weight": 150,
+            "explicit_calories": false,
+            "usda_source": true,
+            "usda_food": "PROSCIUTTO",
+            "usda_kcal_per_100g": 286,
+            "usda_url": "https://fdc.nal.usda.gov/food-details/2495531/nutrients",
+            "usda_alternatives": [
+              {
+                "description": "PROSCIUTTO",
+                "kcal_per_100g": 214,
+                "url": "https://fdc.nal.usda.gov/food-details/2484174/nutrients",
+                "calories": 321,
+                "unit_calories": 321
+              },
+              {
+                "description": "PROSCIUTTO",
+                "kcal_per_100g": 214,
+                "url": "https://fdc.nal.usda.gov/food-details/2016394/nutrients",
+                "calories": 321,
+                "unit_calories": 321
+              },
+              {
+                "description": "PROSCIUTTO",
+                "kcal_per_100g": 214,
+                "url": "https://fdc.nal.usda.gov/food-details/2449187/nutrients",
+                "calories": 321,
+                "unit_calories": 321
+              }
+            ],
+            "model_estimate": {
+              "calories": 135,
+              "unit_calories": 45,
+              "unit_label": "slice"
+            }
+          },
+          {
+            "name": "mozarella",
+            "quantity": "0.5",
+            "calories": 203,
+            "unit_label": "100g",
+            "unit_calories": 406,
+            "estimated_gram_weight": 75,
+            "explicit_calories": false,
+            "usda_source": true,
+            "usda_food": "PEPPERONI AND MOZARELLA CHEESE PIZZA, PEPPERONI; MOZARELLA CHEESE",
+            "usda_kcal_per_100g": 270,
+            "usda_url": "https://fdc.nal.usda.gov/food-details/2568997/nutrients",
+            "usda_alternatives": [
+              {
+                "description": "BELGIOIOSO, FRESH MOZARELLA CHEESE",
+                "kcal_per_100g": 321,
+                "url": "https://fdc.nal.usda.gov/food-details/2032998/nutrients",
+                "calories": 241,
+                "unit_calories": 482
+              },
+              {
+                "description": "UNCURED PEPPERONI & MOZARELLA CHEESE",
+                "kcal_per_100g": 380,
+                "url": "https://fdc.nal.usda.gov/food-details/2180021/nutrients",
+                "calories": 285,
+                "unit_calories": 570
+              },
+              {
+                "description": "GOYA, SWEET CORN AREPA FILLED WITH MOZARELLA CHEESE",
+                "kcal_per_100g": 179,
+                "url": "https://fdc.nal.usda.gov/food-details/1905792/nutrients",
+                "calories": 134,
+                "unit_calories": 268
+              }
+            ],
+            "model_estimate": {
+              "calories": 100,
+              "unit_calories": 200,
+              "unit_label": "ball"
+            }
+          },
+          {
+            "name": "toast",
+            "quantity": "2 slices",
+            "calories": 630,
+            "unit_label": "100g",
+            "unit_calories": 630,
+            "estimated_gram_weight": 200,
+            "explicit_calories": false,
+            "usda_source": true,
+            "usda_food": "Bread, egg, toasted",
+            "usda_kcal_per_100g": 315,
+            "usda_url": "https://fdc.nal.usda.gov/food-details/172674/nutrients",
+            "usda_alternatives": [
+              {
+                "description": "Crackers, rusk toast",
+                "kcal_per_100g": 407,
+                "url": "https://fdc.nal.usda.gov/food-details/174981/nutrients",
+                "calories": 814,
+                "unit_calories": 814
+              }
+            ],
+            "model_estimate": {
+              "calories": 120,
+              "unit_calories": 60,
+              "unit_label": "slice"
+            }
+          }
+        ],
+        "tags": [
+          "lunch",
+          "meat"
+        ],
+        "total_calories": 1283
+      }
+    ],
+    "total_calories": 1283
   }
 }
