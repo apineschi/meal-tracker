@@ -302,14 +302,14 @@
         "from_photo": false,
         "items": [
           {
-            "name": "Not specified Cesar salad",
+            "name": "Cesar salad",
             "quantity": "",
             "calories": 250,
             "unit_label": "Cesar salad",
             "unit_calories": 350
           },
           {
-            "name": "Not specified fridge raiders",
+            "name": "Fridge raiders",
             "quantity": "",
             "calories": 100,
             "unit_label": "packet",
