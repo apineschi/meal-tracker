@@ -330,12 +330,12 @@
           {
             "name": "pizza",
             "quantity": ">1.5",
-            "calories": 420,
+            "calories": 220,
             "unit_label": "100g",
-            "unit_calories": 420,
+            "unit_calories": 220,
             "estimated_gram_weight": 150,
             "explicit_calories": false,
-            "usda_source": true,
+            "usda_source": false,
             "usda_food": "PIZZA HUT 12\" Cheese Pizza, Pan Crust",
             "usda_kcal_per_100g": 280,
             "usda_url": "https://fdc.nal.usda.gov/food-details/172041/nutrients",
@@ -386,9 +386,9 @@
           "dinner",
           "meat"
         ],
-        "total_calories": 1140
+        "total_calories": 940
       }
     ],
-    "total_calories": 1866
+    "total_calories": 1666
   }
 }
