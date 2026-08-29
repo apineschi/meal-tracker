@@ -450,16 +450,16 @@
         "from_photo": false,
         "items": [
           {
-            "name": "Rice crackers",
-            "quantity": "One serving",
+            "name": "One serving Rice crackers",
+            "quantity": "",
             "calories": 40,
             "unit_label": "one serving",
-            "unit_calories": 40,
-            "estimated_gram_weight": 20,
-            "explicit_calories": true
+            "unit_calories": 40
           }
         ],
-        "tags": [],
+        "tags": [
+          "snack"
+        ],
         "total_calories": 40
       },
       {
