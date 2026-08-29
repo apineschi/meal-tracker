@@ -302,31 +302,27 @@
         "from_photo": false,
         "items": [
           {
-            "name": "Cesar salad",
-            "quantity": "Not specified",
-            "calories": 350,
+            "name": "Not specified Cesar salad",
+            "quantity": "",
+            "calories": 250,
             "unit_label": "Cesar salad",
-            "unit_calories": 350,
-            "estimated_gram_weight": 200,
-            "explicit_calories": true
+            "unit_calories": 350
           },
           {
-            "name": "fridge raiders",
-            "quantity": "Not specified",
-            "calories": 120,
+            "name": "Not specified fridge raiders",
+            "quantity": "",
+            "calories": 100,
             "unit_label": "packet",
-            "unit_calories": 120,
-            "estimated_gram_weight": 30,
-            "explicit_calories": false
+            "unit_calories": 120
           }
         ],
         "tags": [
           "lunch",
           "meat"
         ],
-        "total_calories": 470
+        "total_calories": 350
       }
     ],
-    "total_calories": 846
+    "total_calories": 726
   }
 }
