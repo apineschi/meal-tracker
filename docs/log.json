@@ -105,9 +105,47 @@
           "vegetarian"
         ],
         "total_calories": 103
+      },
+      {
+        "time": "2026-08-29T09:29:55.468Z",
+        "raw_input": "2 bananas",
+        "from_photo": false,
+        "items": [
+          {
+            "name": "bananas",
+            "quantity": "2",
+            "calories": 170,
+            "unit_label": "100g",
+            "unit_calories": 85,
+            "estimated_gram_weight": 200,
+            "explicit_calories": false,
+            "usda_source": true,
+            "usda_food": "Bananas, overripe, raw",
+            "usda_kcal_per_100g": 85,
+            "usda_url": "https://fdc.nal.usda.gov/food-details/1105073/nutrients",
+            "usda_alternatives": [
+              {
+                "description": "Bananas, ripe and slightly ripe, raw",
+                "kcal_per_100g": 408,
+                "url": "https://fdc.nal.usda.gov/food-details/1105314/nutrients",
+                "calories": 816,
+                "unit_calories": 408
+              }
+            ],
+            "model_estimate": {
+              "calories": 140,
+              "unit_calories": 70,
+              "unit_label": "banana"
+            }
+          }
+        ],
+        "tags": [
+          "snack"
+        ],
+        "total_calories": 170
       }
     ],
-    "total_calories": 1102
+    "total_calories": 1272
   },
   "2026-08-13": {
     "meals": [],
