@@ -366,12 +366,12 @@
           {
             "name": "French fries",
             "quantity": ">4",
-            "calories": 116,
+            "calories": 50,
             "unit_label": "100g",
-            "unit_calories": 116,
+            "unit_calories": 50,
             "estimated_gram_weight": 40,
             "explicit_calories": false,
-            "usda_source": true,
+            "usda_source": false,
             "usda_food": "APPLEBEE'S, french fries",
             "usda_kcal_per_100g": 290,
             "usda_url": "https://fdc.nal.usda.gov/food-details/169009/nutrients",
@@ -386,9 +386,9 @@
           "dinner",
           "meat"
         ],
-        "total_calories": 940
+        "total_calories": 874
       }
     ],
-    "total_calories": 1666
+    "total_calories": 1600
   }
 }
