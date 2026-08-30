@@ -139,6 +139,7 @@ finding the public URL.
             "unit_calories": 74,
             "estimated_gram_weight": 250,
             "usda_source": true,
+            "usda_reviewed": false,
             "usda_food": "Egg, whole, raw, fresh",
             "usda_kcal_per_100g": 148,
             "usda_url": "https://fdc.nal.usda.gov/food-details/.../nutrients",
@@ -275,16 +276,24 @@ lookup — the visible USDA link and matched food name in the reply exist
 specifically so a future bad match is something the reader can catch by
 eye, not something hidden behind a confident-looking number.
 
-**Every grounded item is reviewable, not just ambiguous ones.**
-`index.html` renders a small picker under each logged item with
-`usda_source: true`, offering three actions: accept as-is (dismisses the
-picker, no server call), reject
+**Every grounded item is reviewable, not just ambiguous ones.** `index.html`
+renders a small picker under each logged item with `usda_source: true` and
+`usda_reviewed` not yet set, offering four actions: accept as-is, reject
 USDA and revert to `model_estimate` (the plain first-pass, pre-grounding
-number — see below), or type an exact calorie value directly. Picking
-anything besides "accept" mutates a local copy of that meal's `items` and
-POSTs the whole array to `/edit-meal` — `handleChat()` returns the new
-meal's `date`/`meal_index` specifically so this later call can target it
-without needing a fresh model call, since the arithmetic was already done.
+number — see below), pick a different USDA alternative, or type an exact
+calorie value directly. All four persist `usda_reviewed: true` on that item
+via `/edit-meal` — an earlier version treated "accept" as a pure client-side
+dismiss (no server call at all) and let picking an alternative leave
+`usda_source` untouched (still `true`, since it's still a USDA-derived
+number, just a different match), so either action left the picker exactly
+as re-appearable as before: it would resurface on every re-render since
+nothing had actually changed about whether the item still needed review.
+`usda_reviewed` exists purely to record "a human already looked at this,"
+independent of whether the underlying number is USDA-sourced or not.
+Picking anything mutates a local copy of that meal's `items` and POSTs the
+whole array to `/edit-meal` — `handleChat()` returns the new meal's
+`date`/`meal_index` specifically so this later call can target it without
+needing a fresh model call, since the arithmetic was already done.
 
 When multiple plausible USDA matches would give meaningfully different
 answers (kcal/100g differing by more than 15%), `lookupUsdaFood()` also

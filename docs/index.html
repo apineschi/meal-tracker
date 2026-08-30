@@ -671,7 +671,7 @@
       : "";
     const altsHtml = m.items
       .map((it, itemIdx) => {
-        if (!it.usda_source) return "";
+        if (!it.usda_source || it.usda_reviewed) return "";
         const label = `"${escapeHtml(it.name)}": using ${escapeHtml(it.usda_food)} (${it.calories} kcal). Not right?`;
         const idxAttrs = `data-meal-index="${i}" data-item-index="${itemIdx}"`;
         let buttons = `<button type="button" data-action="accept-usda" ${idxAttrs}>&check; Looks right</button>`;
@@ -875,9 +875,8 @@
       } catch (err) {
         alert("Error: " + err.message);
       }
-    } else if (btn.dataset.action === "accept-usda") {
-      btn.closest(".usda-alt-block").remove();
     } else if (
+      btn.dataset.action === "accept-usda" ||
       btn.dataset.action === "use-alt" ||
       btn.dataset.action === "use-model-estimate" ||
       btn.dataset.action === "use-manual"
@@ -888,7 +887,9 @@
       const item = meal.items[itemIndex];
 
       let newFields;
-      if (btn.dataset.action === "use-alt") {
+      if (btn.dataset.action === "accept-usda") {
+        newFields = { usda_reviewed: true };
+      } else if (btn.dataset.action === "use-alt") {
         const alt = item.usda_alternatives[Number(btn.dataset.altIndex)];
         newFields = {
           calories: alt.calories,
@@ -897,6 +898,7 @@
           usda_kcal_per_100g: alt.kcal_per_100g,
           usda_url: alt.url,
           usda_source: true,
+          usda_reviewed: true,
         };
       } else if (btn.dataset.action === "use-model-estimate") {
         newFields = {
@@ -904,6 +906,7 @@
           unit_calories: item.model_estimate.unit_calories,
           unit_label: item.model_estimate.unit_label,
           usda_source: false,
+          usda_reviewed: true,
         };
       } else {
         const input = btn.closest(".usda-alt-edit-row").querySelector('[data-role="manual-calories"]');
@@ -915,7 +918,12 @@
         const countMatch = String(item.quantity || "").trim().match(/^([\d.]+)$/);
         const count = countMatch ? parseFloat(countMatch[1]) : null;
         const total = Math.round(val);
-        newFields = { calories: total, unit_calories: count ? Math.round(total / count) : total, usda_source: false };
+        newFields = {
+          calories: total,
+          unit_calories: count ? Math.round(total / count) : total,
+          usda_source: false,
+          usda_reviewed: true,
+        };
       }
 
       const block = btn.closest(".usda-alt-block");
