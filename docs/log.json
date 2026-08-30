@@ -178,7 +178,8 @@
               "calories": 60,
               "unit_calories": 120,
               "unit_label": "peach"
-            }
+            },
+            "usda_reviewed": true
           },
           {
             "name": "prosciutto",
@@ -436,7 +437,8 @@
               "calories": 0,
               "unit_calories": 0,
               "unit_label": "cup"
-            }
+            },
+            "usda_reviewed": true
           }
         ],
         "tags": [
