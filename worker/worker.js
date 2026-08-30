@@ -504,9 +504,30 @@ async function callWorkersAI(env, message) {
   // in code, not inside the model's structured output.
   final.items = final.items.map((it) => {
     // A value the user's own message already stated (pasted from a label,
-    // recipe, or diary export) is authoritative - never second-guess it
-    // with a USDA lookup, however well-matched.
-    if (it.explicit_calories) return it;
+    // recipe, or diary export) is authoritative - never second-guess the
+    // 'calories' figure itself with a USDA lookup, however well-matched.
+    // But unit_label/unit_calories still need correct arithmetic scaling
+    // that stated total against the actual quantity, and the model doesn't
+    // reliably do this either (e.g. mislabeling "150ml, 75 cal" as "100g =
+    // 75 kcal" - keeping the right number but silently relabeling it against
+    // a completely different amount, in the wrong unit besides). Recompute
+    // that deterministically here instead, same principle as the USDA path
+    // below, and never convert what was stated in mL into a gram label.
+    if (it.explicit_calories) {
+      const count = parseCount(it.quantity);
+      const grams = parseGrams(it.quantity);
+      const ml = grams == null ? parseMilliliters(it.quantity) : null;
+      if (count) {
+        return { ...it, unit_label: it.name, unit_calories: Math.round(it.calories / count) };
+      }
+      if (grams) {
+        return { ...it, unit_label: "100g", unit_calories: Math.round((it.calories * 100) / grams) };
+      }
+      if (ml) {
+        return { ...it, unit_label: "100ml", unit_calories: Math.round((it.calories * 100) / ml) };
+      }
+      return it;
+    }
 
     const food = factsByName.get(it.name.toLowerCase());
     if (!food) return it;

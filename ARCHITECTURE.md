@@ -239,10 +239,22 @@ nutrition label, recipe site, or food diary export — "grilled chicken -
 165 cal"), the model sets that item's `explicit_calories: true` and uses the
 stated number directly rather than estimating. `callWorkersAI()` treats this
 as authoritative: it skips the USDA lookup for that item entirely (no point
-spending a request checking a number that will never be overridden) and the
-grounding override step passes the item through untouched. A value you
-typed or pasted yourself always wins over anything the app would otherwise
-compute.
+spending a request checking a number that will never be overridden), and
+the stated `calories` figure itself is never touched by anything downstream.
+
+`unit_label`/`unit_calories` still need correct arithmetic even for an
+explicit value, though, and the model doesn't reliably do that either — a
+real example: "oat milk 150ml, 75 cal" came back labeled "100g = 75 kcal",
+keeping the right total but silently reattaching it to a completely
+different quantity and unit than what was actually measured. So the
+override step recomputes `unit_label`/`unit_calories` deterministically for
+explicit-calories items too, the same way it does for USDA-grounded ones:
+divide by a parsed count, scale to "100g" for a parsed gram quantity, or
+scale to "100ml" for a parsed volume — critically, staying in mL terms
+rather than converting to a gram label, since re-labeling something you
+measured in mL as if it were grams was exactly the confusing part. A vague
+quantity that doesn't parse as any of those is left alone, since there's
+nothing reliable to compute from it.
 
 Tags come from three sources that all just feed the same comma-separated
 `tags` field the Worker merges and dedupes: whatever the model infers from
