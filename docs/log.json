@@ -437,7 +437,8 @@
               "calories": 0,
               "unit_calories": 0,
               "unit_label": "cup"
-            }
+            },
+            "usda_reviewed": true
           }
         ],
         "tags": [
