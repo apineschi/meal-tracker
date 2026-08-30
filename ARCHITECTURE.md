@@ -80,7 +80,10 @@ meal-tracker/
     log.json                # the meal log — written by the Worker, read on load
     settings.json            # { daily_limit } — written by the Worker's /settings endpoint
   worker/
-    worker.js                # Cloudflare Worker source — paste into the dashboard's code editor
+    worker.js                # Cloudflare Worker source
+    wrangler.toml             # Worker config for automated deploys - see below
+  .github/workflows/
+    deploy-worker.yml          # deploys worker/ to Cloudflare on every push that touches it
   ARCHITECTURE.md            # this file
   INSTRUCTIONS.md            # setup + day-to-day operations
 ```
@@ -99,6 +102,29 @@ review picker) existed on the calendar's own "add a meal" box too, making
 the second page pure duplication. The header's **+ Log a meal** button now
 just selects today's date and scrolls/focuses that same box rather than
 navigating anywhere — see "Calendar dashboard" below.
+
+## Automatic Worker deployment
+
+`worker.js` originally had to be manually pasted into Cloudflare's dashboard
+code editor and redeployed after every change — `.github/workflows/deploy-worker.yml`
+now does this automatically via `cloudflare/wrangler-action`, triggered on
+any push that touches `worker/`, authenticated with a `CLOUDFLARE_API_TOKEN`
+GitHub Actions secret (scoped narrowly to "Workers Scripts > Edit" on this
+account, nothing broader).
+
+`worker/wrangler.toml` deliberately declares the `AI` binding and the
+non-secret vars (`GITHUB_OWNER`, `GITHUB_REPO`, `ALLOWED_ORIGIN`) explicitly,
+even though they were already set via the dashboard — once a Worker starts
+being deployed through Wrangler (CLI or CI, same mechanism), Wrangler
+treats the config file as the source of truth for bindings and plain
+variables, and *can* silently drop anything set only in the dashboard that
+isn't also declared in the file. The encrypted secrets (`GITHUB_TOKEN`,
+`NTFY_TOPIC`, `APP_SECRET`, `USDA_API_KEY`) are the one exception to this —
+Cloudflare never deletes a secret as part of a deploy regardless of what the
+config file contains, so they're deliberately *not* in `wrangler.toml`
+(putting a real secret value in a version-controlled file would defeat the
+whole point) and stay managed exactly as before, via the dashboard's
+Settings > Variables and Secrets.
 
 ## Why the Worker needs `APP_SECRET`
 

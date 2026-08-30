@@ -1,0 +1,18 @@
+name = "meal-tracker"
+main = "worker.js"
+compatibility_date = "2026-08-30"
+
+# Secrets (GITHUB_TOKEN, NTFY_TOPIC, APP_SECRET, USDA_API_KEY) are deliberately
+# NOT declared here - they stay managed via the Cloudflare dashboard's
+# Settings > Variables and Secrets (or `wrangler secret put`), and are never
+# touched or deleted by a deploy regardless of what this file contains.
+# Only the Workers AI binding and non-secret vars need to live here so an
+# automated deploy doesn't wipe them.
+
+[ai]
+binding = "AI"
+
+[vars]
+GITHUB_OWNER = "apineschi"
+GITHUB_REPO = "meal-tracker"
+ALLOWED_ORIGIN = "https://apineschi.github.io"

@@ -77,6 +77,30 @@ step, just with less accurate estimates.
 5. Note your Worker's URL, shown at the top of its page — something like
    `https://meal-tracker.<your-subdomain>.workers.dev`.
 
+### 5b. (Optional but recommended) Set up automatic Worker deployment
+
+Without this, every future change to `worker/worker.js` needs to be manually
+pasted into the Cloudflare dashboard's code editor and redeployed. With it,
+pushing a change via GitHub Desktop deploys automatically. This is a one-time
+setup — see ARCHITECTURE.md's "Automatic Worker deployment" section for how
+it works.
+
+1. In Cloudflare: **My Profile** (top right) > **API Tokens** > **Create
+   Token**. Under **Custom token**, add the permission **Account > Workers
+   Scripts > Edit**, then scope it to your specific account. Create it and
+   copy the token — you won't be able to see it again.
+2. Find your **Account ID**: on the Workers & Pages overview page in
+   Cloudflare, it's shown in the right-hand sidebar (or under **Account
+   Home**).
+3. On GitHub: open `apineschi/meal-tracker` > **Settings** > **Secrets and
+   variables** > **Actions** > **New repository secret**. Add two:
+   - `CLOUDFLARE_API_TOKEN` — from step 1.
+   - `CLOUDFLARE_ACCOUNT_ID` — from step 2.
+4. That's it — the next time you push a change under `worker/`, it deploys
+   itself. You can also trigger it manually from the repo's **Actions** tab
+   ("Deploy Worker" > **Run workflow**) if you ever need to force a redeploy
+   without changing anything.
+
 ### 6. Wire the Worker URL into the front end and push
 
 1. In this local folder, open `docs/index.html`.
