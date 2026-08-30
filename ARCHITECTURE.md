@@ -33,7 +33,7 @@ everyone the code, same as job-scraper's dashboard.
 
 ```mermaid
 flowchart TD
-    A["chat.html\n(added to phone home screen)\ntext and/or photo"] -->|"POST /chat\n+ X-App-Secret header"| B["Cloudflare Worker"]
+    A["index.html\n(added to phone home screen)\ntext and/or photo, any day"] -->|"POST /chat\n+ X-App-Secret header"| B["Cloudflare Worker"]
     B --> C1["Workers AI text/vision model\nfirst-pass parse: items,\nquantities, estimated_gram_weight"]
     C1 -->|"if USDA_API_KEY set"| C2["USDA FoodData Central lookup\nper item, Foundation → SR Legacy → all"]
     C2 -->|"real kcal/100g found"| C3["Grounded second-pass model call\n+ calorie math done in code\n(not trusted to the model)"]
@@ -42,19 +42,19 @@ flowchart TD
     C3 --> E
     C4 --> E
     B --> D["GitHub Contents API\nread docs/log.json + docs/settings.json"]
-    E["Append meal to today's entry,\nrecompute daily total"]
+    E["Append meal to that day's entry,\nrecompute daily total"]
     D --> E
     E --> F["GitHub Contents API\nPUT docs/log.json\n(commit as meal-tracker-bot)"]
     E -->|"if total >= daily_limit"| G["ntfy.sh push notification"]
     F --> H["GitHub Pages\ndocs/index.html + docs/log.json"]
-    H --> I["Calendar dashboard\n(browser, reads JSON directly)"]
+    H --> I["Calendar re-renders\nfrom the in-memory response\n(no re-fetch needed)"]
     B -->|"reply + breakdown + running total"| A
 ```
 
-`index.html` (the calendar) and `chat.html` (the logging UI) both read
-`log.json`/`settings.json` directly as static files — no Worker call needed
-just to display data. The Worker is only invoked to *write* (`/chat`,
-`/settings`).
+`index.html` reads `log.json`/`settings.json` directly as static files on
+load — no Worker call needed just to display data. The Worker is only
+invoked to *write* (`/chat`, `/settings`, `/edit-meal`, `/delete-meal`,
+`/estimate-item`).
 
 ## Worker endpoints
 
@@ -74,11 +74,10 @@ All five live in `worker.js`'s `ROUTES` map, POST-only, all requiring the
 ```
 meal-tracker/
   docs/                    # GitHub Pages root — the only publicly served folder
-    index.html             # calendar dashboard
-    chat.html              # meal-logging chat UI (this is what you pin to your home screen)
-    manifest.json           # lets chat.html be "installed" as a standalone app
+    index.html             # the whole app: calendar + logging + editing (pin this to your home screen)
+    manifest.json           # lets index.html be "installed" as a standalone app
     icon.svg
-    log.json                # the meal log — written by the Worker, read by both pages
+    log.json                # the meal log — written by the Worker, read on load
     settings.json            # { daily_limit } — written by the Worker's /settings endpoint
   worker/
     worker.js                # Cloudflare Worker source — paste into the dashboard's code editor
@@ -92,12 +91,21 @@ live view (`docs/jobs.json`) because those have different lifecycles
 (archive never shrinks, live view expires closed jobs). Here, the log *is*
 the display; there's nothing to filter out, so one file serves both purposes.
 
+There used to also be a separate `chat.html` — a standalone chat-style
+logging page, originally the thing pinned to the home screen while
+`index.html` was just the read-only calendar. It was removed once every
+logging feature (photo capture, meal/diet-type buttons, tags, the USDA
+review picker) existed on the calendar's own "add a meal" box too, making
+the second page pure duplication. The header's **+ Log a meal** button now
+just selects today's date and scrolls/focuses that same box rather than
+navigating anywhere — see "Calendar dashboard" below.
+
 ## Why the Worker needs `APP_SECRET`
 
 CORS (`Access-Control-Allow-Origin`) only stops *browsers* from letting other
 websites' JavaScript call your Worker — it does nothing against someone
 calling the Worker URL directly (curl, a script, etc.), and the URL itself is
-sitting in plain view in `chat.html`'s source once the repo is public. Without
+sitting in plain view in `index.html`'s source once the repo is public. Without
 a check, anyone who found that URL could write garbage into your log or (if
 `USDA_API_KEY` is set) burn through its request quota. `APP_SECRET` is a
 password only you know; the front end asks for it once via a real password
@@ -193,7 +201,7 @@ models catalog):
   so a fraction applies only to the item it's stated against, not the whole
   message.
 - **Vision** (`@cf/meta/llama-3.2-11b-vision-instruct`) — used when a photo
-  is attached. `chat.html` downsizes the image client-side (longest edge
+  is attached. `index.html` downsizes the image client-side (longest edge
   1024px, JPEG quality 0.7) before sending, both to keep uploads fast on
   mobile data and to stay well under request size limits. The prompt
   (`PHOTO_SYSTEM_PROMPT`) distinguishes two cases: a **nutrition label**
@@ -239,7 +247,7 @@ Tags come from three sources that all just feed the same comma-separated
 `tags` field the Worker merges and dedupes: whatever the model infers from
 the message text, a free-text tags input, and two rows of quick-tag toggle
 buttons (Breakfast/Lunch/Dinner/Snack/Drink, and separately Meat/Vegetarian/
-Vegan) present on both `chat.html` and `index.html`'s "add a meal" box.
+Vegan) present on `index.html`'s "add a meal" box.
 
 ## USDA grounding (optional, improves accuracy)
 
@@ -267,10 +275,10 @@ lookup — the visible USDA link and matched food name in the reply exist
 specifically so a future bad match is something the reader can catch by
 eye, not something hidden behind a confident-looking number.
 
-**Every grounded item is reviewable, not just ambiguous ones.** Both
-`chat.html` (under the item breakdown) and `index.html` (under each logged
-item) render a small picker for any item with `usda_source: true`, offering
-three actions: accept as-is (dismisses the picker, no server call), reject
+**Every grounded item is reviewable, not just ambiguous ones.**
+`index.html` renders a small picker under each logged item with
+`usda_source: true`, offering three actions: accept as-is (dismisses the
+picker, no server call), reject
 USDA and revert to `model_estimate` (the plain first-pass, pre-grounding
 number — see below), or type an exact calorie value directly. Picking
 anything besides "accept" mutates a local copy of that meal's `items` and
@@ -380,13 +388,17 @@ month. It matches against item names, tags, and the original typed message
 (`raw_input`), not just tags. Clicking a result jumps the calendar to that
 month and opens that day.
 
-## `chat.html` persistence
+## Password persistence
 
-Two independent things persist in `localStorage`, both per-device only (no
-sync between your phone and desktop browser if you use both): the app
-password (see "Why the Worker needs `APP_SECRET`" above), and the visible
-chat transcript itself (capped at the last 200 messages) — so reopening the
-page after closing it doesn't drop back to a blank conversation.
+The app password lives in `localStorage` (see "Why the Worker needs
+`APP_SECRET`" above), per-device only — no sync between your phone and
+desktop browser if you use both. There's no separate chat-transcript
+persistence to speak of: `chat.html` used to keep one (a scrolling
+conversation log, capped at 200 messages), but that was specific to its
+chat-style UI and wasn't carried over when it was removed — the calendar
+itself, organized by day with full edit/delete/review capability, already
+serves as a far more useful permanent record than a flat scrollback ever
+was.
 
 ## App icon (`docs/icon.svg`)
 
@@ -407,7 +419,7 @@ since it's a different project.
 
 ## Known limitations (MVP)
 
-- **Timezone**: `chat.html` sends the browser's local date so meals land on
+- **Timezone**: `index.html` sends the browser's local date so meals land on
   the day you actually ate them regardless of the Worker's server timezone.
   Logging right at midnight is the one edge case that could land on either
   day depending on exact timing.

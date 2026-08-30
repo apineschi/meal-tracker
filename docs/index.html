@@ -4,7 +4,10 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Meal tracker</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#1f6f5c" />
 <link rel="icon" href="icon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="icon.svg" />
 <style>
   :root {
     --bg: #f4f6f5;
@@ -399,7 +402,7 @@
 <body>
 <header>
   <h1>Meal tracker</h1>
-  <a href="chat.html">+ Log a meal</a>
+  <a href="#" id="log-meal-btn">+ Log a meal</a>
 </header>
 <main>
 
@@ -1075,7 +1078,7 @@
       addMealSelectedPhoto = null;
       addMealPhotoFile.value = "";
       addMealPhotoPreview.classList.add("hidden");
-      statusEl.textContent = "Logged.";
+      statusEl.textContent = data.reply && data.reply.trim() ? data.reply : "Logged.";
       renderCalendar();
       renderDayDetail(dateStr);
     } catch (err) {
@@ -1183,6 +1186,19 @@
     } catch (err) {
       statusEl.textContent = "Error: " + err.message;
     }
+  });
+
+  document.getElementById("log-meal-btn").addEventListener("click", (e) => {
+    e.preventDefault();
+    const today = new Date();
+    current = new Date(today.getFullYear(), today.getMonth(), 1);
+    selectedDate = fmt(today);
+    editingIndex = null;
+    renderCalendar();
+    renderDayDetail(selectedDate);
+    const textEl = document.getElementById("add-meal-text");
+    textEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    textEl.focus();
   });
 
   async function load() {

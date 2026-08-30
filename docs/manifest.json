@@ -1,7 +1,7 @@
 {
-  "name": "Log a meal",
-  "short_name": "Log meal",
-  "start_url": "chat.html",
+  "name": "Meal tracker",
+  "short_name": "Meal tracker",
+  "start_url": "index.html",
   "display": "standalone",
   "background_color": "#1f6f5c",
   "theme_color": "#1f6f5c",
